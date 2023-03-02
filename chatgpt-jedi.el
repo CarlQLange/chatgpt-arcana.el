@@ -48,7 +48,7 @@
   :group 'chatgpt-jedi)
 
 (defcustom chatgpt-jedi-system-prompts-alist
-  '((programming-prompt . "You are ChatGPT, a large language model trained by OpenAI to be the perfect programmer, called from an Emacs package. Respond only with concise code unless explicitly asked. ")
+  '((programming-prompt . "You are ChatGPT, a large language model trained by OpenAI to be the perfect programmer, called from an Emacs package. You may only respond with concise code unless explicitly asked. ")
     (writing-prompt . "You are ChatGPT, a large language model trained by OpenAI to be an excellent writing assistant, called from an Emacs package. Respond concisely and carry out instructions. "))
   "An alist that maps system prompt identifiers to actual system prompts."
   :type '(alist :key-type symbol :value-type string)
@@ -115,45 +115,55 @@
       (delete-region (mark) (point))
       (insert modified-region))))
 
+(defun chatgpt-jedi-insert (prompt &optional before ignore-region)
+  "Sends the selected region / custom PROMPT to the OpenAI API with PROMPT and inserts the output before/after the region or at point.
+   With optional argument BEFORE set to true, insert the output before the region."
+  (let ((selected-region (if (region-active-p)
+                             (buffer-substring (mark) (point))
+                           nil)))
+    (deactivate-mark)
+    (save-excursion
+      (let* (
+             (fp (concat (chatgpt-jedi-get-system-prompt) " User input follows.\n\n" "\n\nSelected region:\n" (if (and selected-region (not ignore-region)) (concat " " selected-region) "") prompt) )
+             (inserted-text (chatgpt-jedi--query-api fp)))
+        (message fp)
+        (if before
+            (goto-char (if (< (mark) (point)) (mark) (point)))
+          (goto-char (if (< (mark) (point)) (point) (mark))))
+        (insert inserted-text)))))
+
 (defun chatgpt-jedi-insert-after-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and inserts the output after the region."
   (interactive "sPrompt: ")
-  (let ((selected-region (buffer-substring (mark) (point))))
-    (deactivate-mark)
-    (save-excursion
-      (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt " " selected-region))))
-        (goto-char (point))
-        (insert inserted-text)))))
+  (chatgpt-jedi-insert prompt))
 
 (defun chatgpt-jedi-insert-before-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and inserts the output before the region."
   (interactive "sPrompt: ")
-  (let ((selected-region (buffer-substring (mark) (point))))
-    (deactivate-mark)
-    (save-excursion
-      (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt " " selected-region))))
-        (goto-char (mark))
-        (insert inserted-text)))))
+  (chatgpt-jedi-insert prompt t))
 
 (defun chatgpt-jedi-insert-at-point (prompt)
   "Sends the custom PROMPT to the OpenAI API and inserts the output at point."
   (interactive "sPrompt: ")
-  (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt))))
-    (insert inserted-text)))
+  (chatgpt-jedi-insert prompt nil t))
 
 (defun chatgpt-jedi-insert-at-point-with-context (prompt &optional num-lines)
   "Sends NUM-LINES lines of context around point to the OpenAI API with PROMPT and inserts the output at point."
   (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
-  (let ((line-number (line-number-at-pos (point))))
-    (when (not line-number)
+  (let ((current-line (line-number-at-pos (point))))
+    (when (not current-line)
       (insert (chatgpt-jedi--query-api prompt)))
-    (let* ((num-lines (or num-lines 3))
-           (start-line (max 1 (- line-number (floor ( / num-lines 2)))))
-           (end-line (min (line-number-at-pos (point-max)) (+ line-number (floor (/ num-lines 2)))))
-           (context (buffer-substring (pos-bol start-line) (pos-bol end-line)))
-           (modified-context (chatgpt-jedi--query-api (message (concat (chatgpt-jedi-get-system-prompt) "\n" prompt "\nYour response will go at [XXXX] in the following:\n" (concat (substring context 0 (- (length context) 1)) "[XXXX]" (substring context (- (length context) 1))))))))
+    (insert "[XXXX]")
+    (let* ((current-point (- (point) 6))
+           (num-lines (or num-lines 3))
+           (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
+           (fp (concat (chatgpt-jedi-get-system-prompt) "\n" "\nYour response will be inserted at [XXXX] in the selected region. Do not exceed the bounds of this context.\n" prompt "\nSelected region:\n\n" context))
+           (modified-context (chatgpt-jedi--query-api fp)))
+      (message fp)
+      (message modified-context)
       (save-excursion
-        (goto-char (pos-bol line-number))
+        (goto-char current-point)
+        (delete-char 6)
         (insert modified-context)))))
 
 (defun chatgpt-jedi-generate-prompt-shortcuts ()
