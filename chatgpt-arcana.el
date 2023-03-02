@@ -1,14 +1,15 @@
-;;; chatgpt-arcana.el --- An Emacs package that uses the OpenAI API to write and modify code and text
+;;; chatgpt-arcana.el --- Uses the OpenAI API to write and modify code and text
 
 ;; Copyright (C) 2023 Carl Lange
 ;; Author: Carl Lange <carl.lange@example.com>
 ;; URL: https://github.com/carl-lange/chatgpt-arcana
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "26.1"))
 ;; Version: 0.1
-
+;;
+;; This file is not part of GNU Emacs.
 ;;; Commentary:
 ;;
-;; This package provides a way to use the OpenAI API to write and modify code and text within Emacs.
+;; This package provides a way to use the OpenAI API to write and modify code and text.
 ;;
 ;;; Code:
 
@@ -91,6 +92,7 @@
                (content (gethash "content" msg)))
           (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))))
 
+;;;###autoload
 (defun chatgpt-arcana-query (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
   (interactive "sPrompt: ")
@@ -105,6 +107,7 @@
        (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
          (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-arcana--query-api fp)))))))
 
+;;;###autoload
 (defun chatgpt-arcana-replace-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and replaces the region with the output."
   (interactive "sPrompt: ")
@@ -114,6 +117,7 @@
       (delete-region (mark) (point))
       (insert modified-region))))
 
+;;;###autoload
 (defun chatgpt-arcana-insert (prompt &optional before ignore-region)
   "Sends the selected region / custom PROMPT to the OpenAI API with PROMPT and inserts the output before/after the region or at point.
    With optional argument BEFORE set to true, insert the output before the region."
@@ -133,21 +137,25 @@
             (goto-char (if (< (mark) (point)) (point) (mark)))))
         (insert inserted-text)))))
 
+;;;###autoload
 (defun chatgpt-arcana-insert-after-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and inserts the output after the region."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt))
 
+;;;###autoload
 (defun chatgpt-arcana-insert-before-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and inserts the output before the region."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt t))
 
+;;;###autoload
 (defun chatgpt-arcana-insert-at-point (prompt)
   "Sends the custom PROMPT to the OpenAI API and inserts the output at point."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt nil t))
 
+;;;###autoload
 (defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
   "Sends NUM-LINES lines of context around point to the OpenAI API with PROMPT and inserts the output at point."
   (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
@@ -180,7 +188,7 @@
 
 (use-package pretty-hydra
   :config
-  (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Jedi")
+  (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
     ("Query"
      (("Q" chatgpt-arcana-query "Query")
       ("q" chatgpt-arcana-query-region "Query with region")
@@ -192,3 +200,8 @@
       ("a" chatgpt-arcana-insert-before-region "After region"))
      "Shortcuts"
      (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
+
+
+(provide 'chatgpt-arcana)
+
+;;; chatgpt-arcana.el ends here
