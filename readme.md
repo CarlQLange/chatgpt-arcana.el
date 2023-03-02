@@ -29,6 +29,14 @@ I have to stress at this point that this package is very new, and I only wrote i
 
 There are various interactive functions available, such as `chatgpt-arcana-replace-region`, `chatgpt-arcana-insert-at-point`, and more. Certain ones even work.
 
+This package, for now, provides the following functionality:
+
+- Generate text content based on prompt and optionally selected region using `chatgpt-arcana-query`
+- Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
+- Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
+- Insert generated text at, after or before selected text region using `chatgpt-arcana-insert-after-region` and `chatgpt-arcana-insert-before-region` and `chatgpt-arcana-insert-at-point`
+- Generate custom shortcuts for a hydra of frequently used prompts using `chatgpt-arcana-generate-prompt-shortcuts()` 
+
 ## Requirements
 
 You will need to have an API key from OpenAI’s GPT-3 language model to use this package, and set it as `chatgpt-arcana-api-key`. You can sign up for an API key on the OpenAI website. Depending on how much you use the package, the API cost may vary.
