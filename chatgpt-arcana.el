@@ -14,7 +14,6 @@
 
 (require 'url)
 (require 'json)
-(require 'cl-lib)
 
 (defgroup chatgpt-arcana nil
   "An Emacs package that uses the OpenAI API to write and modify code and text."
