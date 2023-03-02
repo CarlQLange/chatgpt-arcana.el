@@ -118,18 +118,20 @@
 (defun chatgpt-jedi-insert (prompt &optional before ignore-region)
   "Sends the selected region / custom PROMPT to the OpenAI API with PROMPT and inserts the output before/after the region or at point.
    With optional argument BEFORE set to true, insert the output before the region."
-  (let ((selected-region (if (region-active-p)
+  (let ((selected-region (if (and (region-active-p) (not ignore-region))
                              (buffer-substring (mark) (point))
                            nil)))
     (deactivate-mark)
     (save-excursion
-      (let* (
-             (fp (concat (chatgpt-jedi-get-system-prompt) " User input follows.\n\n" "\n\nSelected region:\n" (if (and selected-region (not ignore-region)) (concat " " selected-region) "") prompt) )
+      (let* ((fp (concat (chatgpt-jedi-get-system-prompt)
+                         "\nUser input follows.\n\n"
+                         (when selected-region (concat "Selected region:\n" " " selected-region "\n"))
+                         prompt))
              (inserted-text (chatgpt-jedi--query-api fp)))
-        (message fp)
-        (if before
-            (goto-char (if (< (mark) (point)) (mark) (point)))
-          (goto-char (if (< (mark) (point)) (point) (mark))))
+        (when selected-region
+          (if before
+              (goto-char (if (< (mark) (point)) (mark) (point)))
+            (goto-char (if (< (mark) (point)) (point) (mark)))))
         (insert inserted-text)))))
 
 (defun chatgpt-jedi-insert-after-region (prompt)
@@ -159,8 +161,6 @@
            (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
            (fp (concat (chatgpt-jedi-get-system-prompt) "\n" "\nYour response will be inserted at [XXXX] in the selected region. Do not exceed the bounds of this context.\n" prompt "\nSelected region:\n\n" context))
            (modified-context (chatgpt-jedi--query-api fp)))
-      (message fp)
-      (message modified-context)
       (save-excursion
         (goto-char current-point)
         (delete-char 6)
