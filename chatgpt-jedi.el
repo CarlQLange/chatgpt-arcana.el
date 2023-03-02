@@ -144,17 +144,15 @@
         (goto-char (pos-bol line-number))
         (insert modified-context)))))
 
-(use-package hydra
+(use-package pretty-hydra
   :config
-  (defhydra chatgpt-jedi-hydra (:color blue :hint nil)
-    "
-_q_: Query region   _r_: Insert result   _c_: Clear result
-"
-    ("i" chatgpt-jedi-insert-at-point-with-context)
-    ("I" chatgpt-jedi-insert-at-point)
-    ("q" chatgpt-jedi-query-region)
-    ("m" chatgpt-jedi-replace-region)
-    ("b" chatgpt-jedi-insert-before-region)
-    ("a" chatgpt-jedi-insert-after-region)
-    ("r" (insert chatgpt-jedi-last-query-result))
-    ("c" (setq chatgpt-jedi-last-query-result nil))))
+  (pretty-hydra-define chatgpt-jedi-hydra (:color blue :quit-key "q" :title "ChatGPT Jedi")
+    ("Query"
+     (("Q" chatgpt-jedi-query "Query")
+      ("q" chatgpt-jedi-query-region "Query with region")
+      ("r" chatgpt-jedi-replace-region "Replace region"))
+     "Insert"
+     (("i" chatgpt-jedi-insert-at-point-with-context "At point with context")
+      ("I" chatgpt-jedi-insert-at-point "At point")
+      ("b" chatgpt-jedi-insert-after-region "Before region")
+      ("a" chatgpt-jedi-insert-before-region "After region")))
