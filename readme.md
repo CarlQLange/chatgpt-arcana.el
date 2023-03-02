@@ -1,11 +1,9 @@
 
-# ChatGPT-Jedi
+# Chatgpt-Arcana
 
 ## About
 
-ChatGPT-Jedi is an Emacs Lisp package that gives you Jedi powers. Yer a space wizard now, Harry.
-
-(The name collision with the python Jedi package is coincidence.)
+Chatgpt-Arcana is an Emacs Lisp package that gives you arcane powers. Yer a space wizard now, Harry.
 
 ## Examples
 
@@ -17,21 +15,21 @@ https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-99
 
 ## Installation
 
-ChatGPT-Jedi isn’t on melpa or elpa. You can use use-package to install from github:
+Chatgpt-Arcana isn’t on melpa or elpa. You can use use-package to install from github:
 
 ```elisp
-(use-package chatgpt-jedi
-  :straight (:host github :repo "CarlQLange/ChatGPT-Jedi.el" :files ("*.el"))
-  :init (setq chatgpt-jedi-api-key "your-api-key-here"))
+(use-package chatgpt-arcana
+  :straight (:host github :repo "CarlQLange/Chatgpt-Arcana.el" :files ("*.el"))
+  :init (setq chatgpt-arcana-api-key "your-api-key-here"))
 ```
 
 ## Usage
 
-There are various interactive functions available, such as `chatgpt-jedi-replace-region`, `chatgpt-insert-at-point`, and more. Certain ones even have functionality.
+There are various interactive functions available, such as `chatgpt-arcana-replace-region`, `chatgpt-arcana-insert-at-point`, and more. Certain ones even work.
 
 ## Requirements
 
-You will need to have an API key from OpenAI’s GPT-3 language model to use this package, and set it as `chatgpt-jedi-api-key`. You can sign up for an API key on the OpenAI website. Depending on how much you use the package, the API cost may vary.
+You will need to have an API key from OpenAI’s GPT-3 language model to use this package, and set it as `chatgpt-arcana-api-key`. You can sign up for an API key on the OpenAI website. Depending on how much you use the package, the API cost may vary.
 
 I strongly recommend setting a low usage limit on your account to stop runaway spending. The default model is quite cheap but it costs nothing to be prudent.
 
