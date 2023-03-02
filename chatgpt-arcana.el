@@ -190,14 +190,14 @@
   :config
   (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
     ("Query"
-     (("Q" chatgpt-arcana-query "Query")
-      ("q" chatgpt-arcana-query-region "Query with region")
+     (("a" chatgpt-arcana-query "Query")
+      ("A" chatgpt-arcana-query-region "Query with region")
       ("r" chatgpt-arcana-replace-region "Replace region"))
      "Insert"
      (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
       ("I" chatgpt-arcana-insert-at-point "At point")
-      ("b" chatgpt-arcana-insert-after-region "Before region")
-      ("a" chatgpt-arcana-insert-before-region "After region"))
+      ("j" chatgpt-arcana-insert-after-region "Before region")
+      ("J" chatgpt-arcana-insert-before-region "After region"))
      "Shortcuts"
      (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
 
