@@ -23,6 +23,8 @@ Chatgpt-Arcana isn’t on melpa or elpa. You can use use-package to install from
   :init (setq chatgpt-arcana-api-key "your-api-key-here"))
 ```
 
+I have to stress at this point that this package is very new, and I only wrote it to scratch an itch. Sorry if it turns you into a chicken or something.
+
 ## Usage
 
 There are various interactive functions available, such as `chatgpt-arcana-replace-region`, `chatgpt-arcana-insert-at-point`, and more. Certain ones even work.
