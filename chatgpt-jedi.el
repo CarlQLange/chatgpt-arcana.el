@@ -32,6 +32,21 @@
   :type 'string
   :group 'chatgpt-jedi)
 
+(defcustom chatgpt-jedi-common-prompts-alist
+  '((smaller . "Refactor this code to be more concise")
+    (comment . "Add brief comments to this code.")
+    (explain . "Explain how this code works in a comment with line length 80.")
+    (test . "Write a test case for this code"))
+  "Alist of common prompts."
+  :type 'alist
+  :group 'chatgpt-jedi)
+
+(defcustom chatgpt-jedi-fallback-system-prompt
+  "You are ChatGPT, a large language model trained by OpenAI, called from an Emacs package. Be concise."
+  "A fallback system prompt used when the current major mode is not found in the `chatgpt-jedi-system-prompts-alist`."
+  :type 'string
+  :group 'chatgpt-jedi)
+
 (defcustom chatgpt-jedi-system-prompts-alist
   '((programming-prompt . "You are ChatGPT, a large language model trained by OpenAI to be the perfect programmer, called from an Emacs package. Respond only with concise code unless explicitly asked. ")
     (writing-prompt . "You are ChatGPT, a large language model trained by OpenAI to be an excellent writing assistant, called from an Emacs package. Respond concisely and carry out instructions. "))
@@ -39,14 +54,9 @@
   :type '(alist :key-type symbol :value-type string)
   :group 'chatgpt-jedi)
 
-(defcustom chatgpt-jedi-fallback-prompt
-  "You are ChatGPT, a large language model trained by OpenAI, called from an Emacs package. Be concise."
-  "A fallback system prompt used when the current major mode is not found in the `chatgpt-jedi-system-prompts-alist`."
-  :type 'string
-  :group 'chatgpt-jedi)
-
 (defcustom chatgpt-jedi-system-prompts-modes-alist
   '((prog-mode . programming-prompt)
+    (emacs-lisp-mode . programming-prompt)
     (org-mode . writing-prompt)
     (markdown-mode . writing-prompt))
   "An alist that maps major modes to system prompt identifiers."
@@ -58,8 +68,8 @@
   (let* ((mode-name (symbol-name major-mode))
          (prompt-identifier (cdr (assoc major-mode chatgpt-jedi-system-prompts-modes-alist)))
          (system-prompt (or (cdr (assoc prompt-identifier chatgpt-jedi-system-prompts-alist))
-                            chatgpt-jedi-fallback-prompt)))
-    (concat system-prompt "\nCurrent major mode: " mode-name)))
+                            chatgpt-jedi-fallback-system-prompt)))
+    (concat system-prompt " Current Emacs major mode: " mode-name ".")))
 
 (defun chatgpt-jedi--query-api (prompt)
   "Sends a query to the OpenAI API with PROMPT and returns the first message content."
@@ -80,19 +90,21 @@
                (choices (gethash "choices" response-data))
                (msg (gethash "message" (car choices)))
                (content (gethash "content" msg)))
-          (message (string-trim content)))))))
+          (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))))
 
 (defun chatgpt-jedi-query (prompt)
-  "Sends PROMPT to the OpenAI API and returns the result."
-  (interactive "sPrompt: ")
-  (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt)))
-
-(defun chatgpt-jedi-query-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
   (interactive "sPrompt: ")
-  (let ((selected-region (buffer-substring (mark) (point))))
+  (let*
+      ((selected-region (and (use-region-p) (buffer-substring (mark) (point))))
+       (system-prompt (chatgpt-jedi-get-system-prompt)))
     (deactivate-mark)
-    (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt "\n" selected-region))))
+    (with-current-buffer (get-buffer-create "*chatgpt-jedi-response*")
+      (erase-buffer)
+      (markdown-mode)
+      (insert
+       (let* ((fp (concat system-prompt " Respond in markdown." "\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
+         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-jedi--query-api fp)))))))
 
 (defun chatgpt-jedi-replace-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and replaces the region with the output."
@@ -144,9 +156,22 @@
         (goto-char (pos-bol line-number))
         (insert modified-context)))))
 
+(defun chatgpt-jedi-generate-prompt-shortcuts ()
+  "Generate a list of hydra commands for each prompt in `chatgpt-jedi-common-prompts-alist`."
+  (mapcar (lambda (prompt)
+            (let* ((identifier (car prompt))
+                   (label (capitalize (symbol-name identifier)))
+                   (key (concat "s" (substring (symbol-name identifier) 0 1)))
+                   (command `(,key
+                               (lambda () (interactive)
+                                 (chatgpt-jedi-query-region ,(cdr prompt)))
+                               ,label)))
+              command))
+          (cdr chatgpt-jedi-common-prompts-alist)))
+
 (use-package pretty-hydra
   :config
-  (pretty-hydra-define chatgpt-jedi-hydra (:color blue :quit-key "q" :title "ChatGPT Jedi")
+  (eval `(pretty-hydra-define chatgpt-jedi-hydra (:color blue :quit-key "q" :title "ChatGPT Jedi")
     ("Query"
      (("Q" chatgpt-jedi-query "Query")
       ("q" chatgpt-jedi-query-region "Query with region")
@@ -155,4 +180,6 @@
      (("i" chatgpt-jedi-insert-at-point-with-context "At point with context")
       ("I" chatgpt-jedi-insert-at-point "At point")
       ("b" chatgpt-jedi-insert-after-region "Before region")
-      ("a" chatgpt-jedi-insert-before-region "After region")))
+      ("a" chatgpt-jedi-insert-before-region "After region"))
+     "Shortcuts"
+     (,@(chatgpt-jedi-generate-prompt-shortcuts))))))
