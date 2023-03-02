@@ -1,9 +1,9 @@
 
-# Chatgpt-Arcana
+# ChatGPT-Arcana
 
 ## About
 
-Chatgpt-Arcana is an Emacs Lisp package that gives you arcane powers. Yer a space wizard now, Harry.
+ChatGPT-Arcana is an Emacs Lisp package that gives you arcane powers. Yer a space wizard now, Harry.
 
 ## Examples
 
@@ -15,11 +15,11 @@ https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-99
 
 ## Installation
 
-Chatgpt-Arcana isn’t on melpa or elpa. You can use use-package to install from github:
+ChatGPT-Arcana isn’t on melpa or elpa. You can use use-package to install from github:
 
 ```elisp
 (use-package chatgpt-arcana
-  :straight (:host github :repo "CarlQLange/Chatgpt-Arcana.el" :files ("*.el"))
+  :straight (:host github :repo "CarlQLange/ChatGPT-Arcana.el" :files ("*.el"))
   :init (setq chatgpt-arcana-api-key "your-api-key-here"))
 ```
 
