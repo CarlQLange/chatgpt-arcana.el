@@ -1,8 +1,8 @@
 ;;; chatgpt-arcana.el --- Uses the OpenAI API to write and modify code and text
 
 ;; Copyright (C) 2023 Carl Lange
-;; Author: Carl Lange <carl.lange@example.com>
-;; URL: https://github.com/carl-lange/chatgpt-arcana
+;; Author: Carl Lange <carl@flax.ie>
+;; URL: https://github.com/CarlQLange/chatgpt-arcana
 ;; Package-Requires: ((emacs "26.1"))
 ;; Version: 0.1
 ;;
