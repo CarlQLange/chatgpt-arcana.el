@@ -5,9 +5,15 @@
 
 ChatGPT-Jedi is an Emacs Lisp package that gives you Jedi powers. Yer a space wizard now, Harry.
 
+(The name collision with the python Jedi package is coincidence.)
+
+## Examples
+
 https://user-images.githubusercontent.com/859820/222489571-27901725-158e-4a2a-899a-36a3f4eea2c1.mp4
 
-(The name collision with the python Jedi package is an accident.)
+https://user-images.githubusercontent.com/859820/222561453-031d271f-4fee-46f4-b63e-734729e01745.mp4
+
+https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-9916-f5a7d24acc81.mp4
 
 ## Installation
 
