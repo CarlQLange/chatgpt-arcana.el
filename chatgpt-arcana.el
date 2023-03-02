@@ -25,7 +25,7 @@
   :type 'string
   :group 'chatgpt-arcana)
 
-(defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/completions")
+(defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
 (defcustom chatgpt-arcana-model-name "gpt-3.5-turbo"
   "The name of the OpenAI model to use. Some cost more than others. Beware."
