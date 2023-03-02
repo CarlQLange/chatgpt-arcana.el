@@ -25,12 +25,41 @@
   :type 'string
   :group 'chatgpt-jedi)
 
-(defvar chatgpt-jedi-api-endpoint "https://api.openai.com/v1/chat/completions")
+(defvar chatgpt-jedi-api-endpoint "https://api.openai.com/v1/completions")
 
 (defcustom chatgpt-jedi-model-name "gpt-3.5-turbo"
-  "The name of the OpenAI model to use."
+  "The name of the OpenAI model to use. Some cost more than others. Beware."
   :type 'string
   :group 'chatgpt-jedi)
+
+(defcustom chatgpt-jedi-system-prompts-alist
+  '((programming-prompt . "You are ChatGPT, a large language model trained by OpenAI to be the perfect programmer, called from an Emacs package. Respond only with concise code unless explicitly asked. ")
+    (writing-prompt . "You are ChatGPT, a large language model trained by OpenAI to be an excellent writing assistant, called from an Emacs package. Respond concisely and carry out instructions. "))
+  "An alist that maps system prompt identifiers to actual system prompts."
+  :type '(alist :key-type symbol :value-type string)
+  :group 'chatgpt-jedi)
+
+(defcustom chatgpt-jedi-fallback-prompt
+  "You are ChatGPT, a large language model trained by OpenAI, called from an Emacs package. Be concise."
+  "A fallback system prompt used when the current major mode is not found in the `chatgpt-jedi-system-prompts-alist`."
+  :type 'string
+  :group 'chatgpt-jedi)
+
+(defcustom chatgpt-jedi-system-prompts-modes-alist
+  '((prog-mode . programming-prompt)
+    (org-mode . writing-prompt)
+    (markdown-mode . writing-prompt))
+  "An alist that maps major modes to system prompt identifiers."
+  :type '(alist :key-type symbol :value-type symbol)
+  :group 'chatgpt-jedi)
+
+(defun chatgpt-jedi-get-system-prompt ()
+  "Returns the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
+  (let* ((mode-name (symbol-name major-mode))
+         (prompt-identifier (cdr (assoc major-mode chatgpt-jedi-system-prompts-modes-alist)))
+         (system-prompt (or (cdr (assoc prompt-identifier chatgpt-jedi-system-prompts-alist))
+                            chatgpt-jedi-fallback-prompt)))
+    (concat system-prompt "\nCurrent major mode: " mode-name)))
 
 (defun chatgpt-jedi--query-api (prompt)
   "Sends a query to the OpenAI API with PROMPT and returns the first message content."
@@ -53,27 +82,24 @@
                (content (gethash "content" msg)))
           (message (string-trim content)))))))
 
-(defvar chatgpt-jedi-last-query-result nil
-  "The result of the last query to the OpenAI API.")
-
 (defun chatgpt-jedi-query (prompt)
   "Sends PROMPT to the OpenAI API and returns the result."
   (interactive "sPrompt: ")
-  (chatgpt-jedi--query-api prompt))
+  (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt)))
 
 (defun chatgpt-jedi-query-region (prompt)
-  "Sends the selected region to the OpenAI API with PROMPT."
+  "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
   (interactive "sPrompt: ")
   (let ((selected-region (buffer-substring (mark) (point))))
     (deactivate-mark)
-    (chatgpt-jedi--query-api (concat prompt " " selected-region))))
+    (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt "\n" selected-region))))
 
 (defun chatgpt-jedi-replace-region (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and replaces the region with the output."
   (interactive "sPrompt: ")
   (let ((selected-region (buffer-substring (mark) (point))))
     (deactivate-mark)
-    (let ((modified-region (chatgpt-jedi--query-api (concat prompt " " selected-region))))
+    (let ((modified-region (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt " " selected-region))))
       (delete-region (mark) (point))
       (insert modified-region))))
 
@@ -83,7 +109,7 @@
   (let ((selected-region (buffer-substring (mark) (point))))
     (deactivate-mark)
     (save-excursion
-      (let ((inserted-text (chatgpt-jedi--query-api (concat prompt " " selected-region))))
+      (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt " " selected-region))))
         (goto-char (point))
         (insert inserted-text)))))
 
@@ -93,14 +119,14 @@
   (let ((selected-region (buffer-substring (mark) (point))))
     (deactivate-mark)
     (save-excursion
-      (let ((inserted-text (chatgpt-jedi--query-api (concat prompt " " selected-region))))
+      (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt " " selected-region))))
         (goto-char (mark))
         (insert inserted-text)))))
 
 (defun chatgpt-jedi-insert-at-point (prompt)
   "Sends the custom PROMPT to the OpenAI API and inserts the output at point."
   (interactive "sPrompt: ")
-  (let ((inserted-text (chatgpt-jedi--query-api prompt)))
+  (let ((inserted-text (chatgpt-jedi--query-api (concat (chatgpt-jedi-get-system-prompt) "\n" prompt))))
     (insert inserted-text)))
 
 (defun chatgpt-jedi-insert-at-point-with-context (prompt &optional num-lines)
@@ -113,7 +139,7 @@
            (start-line (max 1 (- line-number (floor ( / num-lines 2)))))
            (end-line (min (line-number-at-pos (point-max)) (+ line-number (floor (/ num-lines 2)))))
            (context (buffer-substring (pos-bol start-line) (pos-bol end-line)))
-           (modified-context (chatgpt-jedi--query-api (message (concat prompt "\nYour response will go at [XXXX] in the following:\n" (concat (substring context 0 (- (length context) 1)) "[XXXX]" (substring context (- (length context) 1))))))))
+           (modified-context (chatgpt-jedi--query-api (message (concat (chatgpt-jedi-get-system-prompt) "\n" prompt "\nYour response will go at [XXXX] in the following:\n" (concat (substring context 0 (- (length context) 1)) "[XXXX]" (substring context (- (length context) 1))))))))
       (save-excursion
         (goto-char (pos-bol line-number))
         (insert modified-context)))))

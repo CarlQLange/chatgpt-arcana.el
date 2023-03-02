@@ -24,11 +24,14 @@ ChatGPT-Jedi isn’t on melpa or elpa. You can use use-package to install from g
 There are various interactive functions available, such as `chatgpt-jedi-replace-region`, `chatgpt-insert-at-point`, and more. Certain ones even have functionality.
 
 ## Requirements
+
 You will need to have an API key from OpenAI’s GPT-3 language model to use this package, and set it as `chatgpt-jedi-api-key`. You can sign up for an API key on the OpenAI website. Depending on how much you use the package, the API cost may vary.
+
+I strongly recommend setting a low usage limit on your account to stop runaway spending. The default model is quite cheap but it costs nothing to be prudent.
 
 ## Credits
 
-This package was developed by Carl Lange with judicious help from ChatGPT.
+This package was developed by Carl Lange with judicious help from ChatGPT. 
 
 ## License
 
