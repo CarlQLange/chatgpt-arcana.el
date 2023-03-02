@@ -103,7 +103,7 @@
       (erase-buffer)
       (markdown-mode)
       (insert
-       (let* ((fp (concat system-prompt " Respond in markdown." "\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
+       (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
          (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-jedi--query-api fp)))))))
 
 (defun chatgpt-jedi-replace-region (prompt)
