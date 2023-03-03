@@ -68,9 +68,13 @@
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
+(defcustom chatgpt-arcana-chat-last-lines 200
+  "Number of last lines in the buffer to send in a chat as context. Has cost implications."
+  :type 'integer
+  :group 'chatgpt-arcana)
+
 (define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
-  (local-set-key (kbd "C-c C-q") 'chatgpt-arcana-query)
   (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end))
 
 (defun chatgpt-arcana-get-system-prompt ()
@@ -231,7 +235,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   (interactive)
   (save-excursion
     (goto-char (point-max))
-    (dotimes (i 100)
+    (dotimes (i chatgpt-arcana-chat-last-lines)
       (forward-line -1))
     (let ((selected-region (buffer-substring (point) (point-max))))
       (deactivate-mark)

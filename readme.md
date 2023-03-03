@@ -3,7 +3,7 @@
 
 ## About
 
-ChatGPT-Arcana is an Emacs Lisp package that gives you arcane powers. Yer a space wizard now, Harry.
+🔮 ChatGPT-Arcana is an Emacs Lisp package that gives you arcane powers. Yer a space wizard now, Harry.
 
 ## Examples
 
@@ -31,6 +31,7 @@ There are various interactive functions available, such as `chatgpt-arcana-repla
 
 This package, for now, provides the following functionality:
 
+- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat`.
 - Generate text content based on prompt and optionally selected region using `chatgpt-arcana-query`
 - Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
 - Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
