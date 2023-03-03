@@ -50,6 +50,12 @@
   :type 'string
   :group 'chatgpt-arcana)
 
+(defcustom chatgpt-arcana-generated-buffer-name-prompt
+  "Generate a useful and descriptive name based on this content. The name should be unique to the input, lowercase, hyphenated, not contain the words buffer or chatgpt, not too short. RESPOND ONLY WITH THE NAME. File content follows.\n"
+  "Prompt used to generate buffer names."
+  :type 'string
+  :group 'chatgpt-arcana)
+
 (defcustom chatgpt-arcana-system-prompts-alist
   '((programming-prompt . "You are a large language model living inside Emacs, and the perfect programmer. You may only respond with concise code unless explicitly asked. ")
     (writing-prompt . "You are a large language model living inside Emacs, and an excellent writing assistant. Respond concisely and carry out instructions. ")
@@ -76,11 +82,8 @@
 (define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
   (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end)
-  (run-with-idle-timer 5 nil
-                       (lambda ()
-                         (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
-                           (unless (get-buffer new-name)
-                             (rename-buffer new-name))))))
+  (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
+  (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically))
 
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
@@ -125,12 +128,19 @@ If TEMP, adds asterisks to the name."
   (let ((name
          (chatgpt-arcana--query-api
           (concat
-           "Generate a useful and descriptive name based on this content. The name should be unique to the input, lowercase, hyphenated, not contain the words buffer or chatgpt, not too short. RESPOND ONLY WITH THE NAME. File content follows.\n"
+           chatgpt-arcana-generated-buffer-name-prompt
            (substring (buffer-substring-no-properties (1+ (string-match "\n" (buffer-string))) (min 1200 (point-max))))))))
     (cond ((and prefix temp) (concat "*" prefix name "*"))
           (prefix (concat prefix "-" name))
           (temp (concat "*" name "*"))
           (t name))))
+
+(defun chatgpt-arcana-chat-rename-buffer-automatically ()
+  "Magically rename a buffer based on its contents."
+  (interactive)
+  (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
+    (unless (get-buffer new-name)
+      (rename-buffer new-name))))
 
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
@@ -241,8 +251,8 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
 (defun chatgpt-arcana-chat-start-new-chat-response ()
-  "Add dividing lines and user input prompt to *chatgpt-arcana-response* buffer."
-  (with-current-buffer "*chatgpt-arcana-response*"
+  "Add dividing lines and user input prompt to a buffer."
+  (with-current-buffer (buffer-name)
     (goto-char (point-max))
     (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
       (insert "\n\n-------\n\n"))
@@ -250,6 +260,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
     (goto-char (point-max))))
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
+  "Send the current buffer and insert the response at the end - useful for chatting."
   (interactive)
   (save-excursion
     (goto-char (point-max))
