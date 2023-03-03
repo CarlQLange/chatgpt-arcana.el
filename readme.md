@@ -7,11 +7,17 @@
 
 ## Examples
 
+#### Create and edit code
 https://user-images.githubusercontent.com/859820/222489571-27901725-158e-4a2a-899a-36a3f4eea2c1.mp4
 
+#### Write a doc about ffmpeg in org-mode
 https://user-images.githubusercontent.com/859820/222561453-031d271f-4fee-46f4-b63e-734729e01745.mp4
 
+#### Explain code in the selected region
 https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-9916-f5a7d24acc81.mp4
+
+#### Have a lovely chat
+https://user-images.githubusercontent.com/859820/222718608-b767a663-86f9-4c56-acbe-192e1e91fe26.mp4
 
 ## Installation
 
