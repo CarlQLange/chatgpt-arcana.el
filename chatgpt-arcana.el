@@ -94,11 +94,9 @@
     :encoding 'utf-8
     :success (cl-function
               (lambda (&key data &allow-other-keys)
-                (message "aXXXX %S" (gethash "content" (gethash "message" (car (gethash "choices" data)))))
                 (let* ((choices (gethash "choices" data))
                        (msg (gethash "message" (car choices)))
                        (content (gethash "content" msg)))
-                  (message content)
                   (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))
     :error (lambda (error-thrown)
              (message "Error: %S" error-thrown))))
