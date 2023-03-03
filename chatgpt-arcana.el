@@ -9,7 +9,7 @@
 ;; This file is not part of GNU Emacs.
 ;;; Commentary:
 ;;
-;; This package provides a way to use the OpenAI API to write and modify code and text.
+;; This package provides a way to use the ChatGPT API to write and modify code and text.
 ;;
 ;;; Code:
 
@@ -45,14 +45,15 @@
   :group 'chatgpt-arcana)
 
 (defcustom chatgpt-arcana-fallback-system-prompt
-  "You are ChatGPT, a large language model trained by OpenAI, called from an Emacs package. Be concise."
+  "You are a large language model living inside Emacs. Help the user and be concise."
   "A fallback system prompt used when the current major mode is not found in the `chatgpt-arcana-system-prompts-alist`."
   :type 'string
   :group 'chatgpt-arcana)
 
 (defcustom chatgpt-arcana-system-prompts-alist
-  '((programming-prompt . "You are ChatGPT, a large language model trained by OpenAI to be the perfect programmer, called from an Emacs package. You may only respond with concise code unless explicitly asked. ")
-    (writing-prompt . "You are ChatGPT, a large language model trained by OpenAI to be an excellent writing assistant, called from an Emacs package. Respond concisely and carry out instructions. "))
+  '((programming-prompt . "You are a large language model living inside Emacs, and the perfect programmer. You may only respond with concise code unless explicitly asked. ")
+    (writing-prompt . "You are a large language model living inside Emacs, and an excellent writing assistant. Respond concisely and carry out instructions. ")
+    (chat-prompt . "You are a large language model living inside Emacs, and an excellent conversation partner. Respond concisely. "))
   "An alist that maps system prompt identifiers to actual system prompts."
   :type '(alist :key-type symbol :value-type string)
   :group 'chatgpt-arcana)
@@ -61,13 +62,19 @@
   '((prog-mode . programming-prompt)
     (emacs-lisp-mode . programming-prompt)
     (org-mode . writing-prompt)
-    (markdown-mode . writing-prompt))
+    (markdown-mode . writing-prompt)
+    (chatgpt-arcana-chat-mode . chat-prompt))
   "An alist that maps major modes to system prompt identifiers."
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
+(define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
+  "A mode for chatting with the OpenAI GPT-3 API."
+  (local-set-key (kbd "C-c C-q") 'chatgpt-arcana-query)
+  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end))
+
 (defun chatgpt-arcana-get-system-prompt ()
-  "Returns the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
+  "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
   (let* ((mode-name (symbol-name major-mode))
          (prompt-identifier (cdr (assoc major-mode chatgpt-arcana-system-prompts-modes-alist)))
          (system-prompt (or (cdr (assoc prompt-identifier chatgpt-arcana-system-prompts-alist))
@@ -76,7 +83,7 @@
 (require 'request)
 
 (defun chatgpt-arcana--query-api (prompt)
-  "Sends a query to the OpenAI API with PROMPT and returns the first message content."
+  "Send a query to the OpenAI API with PROMPT and return the first message content."
   (let ((out))
     (request
       chatgpt-arcana-api-endpoint
@@ -113,14 +120,17 @@
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
       (erase-buffer)
-      (markdown-mode)
+      (chatgpt-arcana-chat-mode)
       (insert
        (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
-         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-arcana--query-api fp)))))))
+         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-arcana--query-api fp))))
+      (unless (get-buffer-window "*chatgpt-arcana-response*")
+        (split-window-horizontally)
+        (switch-to-buffer "*chatgpt-arcana-response*")))))
 
 ;;;###autoload
 (defun chatgpt-arcana-replace-region (prompt)
-  "Sends the selected region to the OpenAI API with PROMPT and replaces the region with the output."
+  "Send the selected region to the OpenAI API with PROMPT and replace the region with the output."
   (interactive "sPrompt: ")
   (let ((selected-region (buffer-substring (mark) (point))))
     (deactivate-mark)
@@ -130,8 +140,11 @@
 
 ;;;###autoload
 (defun chatgpt-arcana-insert (prompt &optional before ignore-region)
-  "Sends the selected region / custom PROMPT to the OpenAI API with PROMPT and inserts the output before/after the region or at point.
-   With optional argument BEFORE set to true, insert the output before the region."
+  "Insert text at, before, or after the selected region or point.
+Send the selected region / custom PROMPT to the OpenAI API with PROMPT
+and insert the output before/after the region or at point.
+With optional argument BEFORE set to true, insert the output before the region.
+With optional argument IGNORE-REGION, don't pay attention to the selected region."
   (let ((selected-region (if (and (region-active-p) (not ignore-region))
                              (buffer-substring (mark) (point))
                            nil)))
@@ -150,25 +163,25 @@
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-after-region (prompt)
-  "Sends the selected region to the OpenAI API with PROMPT and inserts the output after the region."
+  "Send the selected region to the OpenAI API with PROMPT and insert the output after the region."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt))
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-before-region (prompt)
-  "Sends the selected region to the OpenAI API with PROMPT and inserts the output before the region."
+  "Send the selected region to the OpenAI API with PROMPT and insert the output before the region."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt t))
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-at-point (prompt)
-  "Sends the custom PROMPT to the OpenAI API and inserts the output at point."
+  "Send the custom PROMPT to the OpenAI API and insert the output at point."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt nil t))
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
-  "Sends NUM-LINES lines of context around point to the OpenAI API with PROMPT and inserts the output at point."
+  "Send NUM-LINES lines of context around point to the OpenAI API with PROMPT and insert the output at point."
   (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
   (let ((current-line (line-number-at-pos (point))))
     (when (not current-line)
@@ -183,6 +196,55 @@
         (goto-char current-point)
         (delete-char 6)
         (insert modified-context)))))
+
+;;;###autoload
+(defun chatgpt-arcana-start-chat (prompt)
+  "Start a chat with PROMPT"
+  (interactive "sPrompt: ")
+  (let*
+      ((selected-region (and (use-region-p) (buffer-substring (mark) (point)))))
+    (deactivate-mark)
+    (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
+      (erase-buffer)
+      (chatgpt-arcana-chat-mode)
+      (insert
+       (let* ((fp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
+         (concat
+          (replace-regexp-in-string "^" "> " fp nil t)
+          "\n\n-------\n\n"
+          (chatgpt-arcana--query-api fp))))
+      (chatgpt-arcana-chat-start-new-chat-response)
+      (unless (get-buffer-window "*chatgpt-arcana-response*")
+        (split-window-horizontally)
+        (switch-to-buffer "*chatgpt-arcana-response*")))))
+
+(defun chatgpt-arcana-chat-start-new-chat-response ()
+  "Add dividing lines and user input prompt to *chatgpt-arcana-response* buffer."
+  (with-current-buffer "*chatgpt-arcana-response*"
+    (goto-char (point-max))
+    (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
+      (insert "\n\n-------\n\n"))
+    (insert "> ")
+    (goto-char (point-max))))
+
+(defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
+  (interactive)
+  (save-excursion
+    (goto-char (point-max))
+    (dotimes (i 100)
+      (forward-line -1))
+    (let ((selected-region (buffer-substring (point) (point-max))))
+      (deactivate-mark)
+      (let* ((fp (concat (chatgpt-arcana-get-system-prompt)
+                         "\nA chat session follows. User input is marked with >.\n\n"
+                         selected-region))
+             (inserted-text (chatgpt-arcana--query-api fp)))
+        (goto-char (point-max))
+        (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
+          (setq inserted-text (concat "\n\n-------\n\n" inserted-text)))
+        (insert inserted-text)
+        (chatgpt-arcana-chat-start-new-chat-response))))
+  (goto-char (point-max)))
 
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
   "Generate a list of hydra commands for each prompt in `chatgpt-arcana-common-prompts-alist`."
