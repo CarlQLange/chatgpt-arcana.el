@@ -77,29 +77,31 @@
 
 (defun chatgpt-arcana--query-api (prompt)
   "Sends a query to the OpenAI API with PROMPT and returns the first message content."
-  (request
-    chatgpt-arcana-api-endpoint
-    :type "POST"
-    :data (json-encode `((model . ,chatgpt-arcana-model-name)
-                         (messages . [((role . "user")
-                                       (content . ,prompt))])))
-    :headers `(("Content-Type" . "application/json")
-               ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
-    :sync t
-    :parser (lambda ()
-              (let ((json-object-type 'hash-table)
-                    (json-array-type 'list)
-                    (json-key-type 'string))
-                (json-read)))
-    :encoding 'utf-8
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (let* ((choices (gethash "choices" data))
-                       (msg (gethash "message" (car choices)))
-                       (content (gethash "content" msg)))
-                  (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))
-    :error (lambda (error-thrown)
-             (message "Error: %S" error-thrown))))
+  (let ((out))
+    (request
+      chatgpt-arcana-api-endpoint
+      :type "POST"
+      :data (json-encode `((model . ,chatgpt-arcana-model-name)
+                           (messages . [((role . "user")
+                                         (content . ,prompt))])))
+      :headers `(("Content-Type" . "application/json")
+                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
+      :sync t
+      :parser (lambda ()
+                (let ((json-object-type 'hash-table)
+                      (json-array-type 'list)
+                      (json-key-type 'string))
+                  (json-read)))
+      :encoding 'utf-8
+      :success (cl-function
+                (lambda (&key response &allow-other-keys)
+                  (let* ((choices (gethash "choices" (request-response-data response)))
+                         (msg (gethash "message" (car choices)))
+                         (content (gethash "content" msg)))
+                    (setq out (replace-regexp-in-string "[“”‘’]" "`" (string-trim content))))))
+      :error (lambda (error-thrown)
+               (message "Error: %S" error-thrown)))
+    out))
 
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
