@@ -75,7 +75,12 @@
 
 (define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
-  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end))
+  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end)
+  (run-with-idle-timer 5 nil
+                       (lambda ()
+                         (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
+                           (unless (get-buffer new-name)
+                             (rename-buffer new-name))))))
 
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
@@ -84,7 +89,6 @@
          (system-prompt (or (cdr (assoc prompt-identifier chatgpt-arcana-system-prompts-alist))
                             chatgpt-arcana-fallback-system-prompt)))
     (concat system-prompt " Current Emacs major mode: " mode-name ".")))
-(require 'request)
 
 (defun chatgpt-arcana--query-api (prompt)
   "Send a query to the OpenAI API with PROMPT and return the first message content."
@@ -114,6 +118,20 @@
                (message "Error: %S" error-thrown)))
     out))
 
+(defun chatgpt-arcana-generate-buffer-name (&optional prefix temp)
+  "Generate a buffer name based on the first characters of the buffer.
+If PREFIX, adds the prefix in front of the name.
+If TEMP, adds asterisks to the name."
+  (let ((name
+         (chatgpt-arcana--query-api
+          (concat
+           "Generate a useful and descriptive name based on this content. The name should be unique to the input, lowercase, hyphenated, not contain the words buffer or chatgpt, not too short. RESPOND ONLY WITH THE NAME. File content follows.\n"
+           (substring (buffer-substring-no-properties (1+ (string-match "\n" (buffer-string))) (min 1200 (point-max))))))))
+    (cond ((and prefix temp) (concat "*" prefix name "*"))
+          (prefix (concat prefix "-" name))
+          (temp (concat "*" name "*"))
+          (t name))))
+
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
@@ -126,7 +144,7 @@
       (erase-buffer)
       (chatgpt-arcana-chat-mode)
       (insert
-       (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
+       (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
          (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-arcana--query-api fp))))
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (split-window-horizontally)
@@ -156,8 +174,8 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
     (save-excursion
       (let* ((fp (concat (chatgpt-arcana-get-system-prompt)
                          "\nUser input follows.\n\n"
-                         (when selected-region (concat "Selected region:\n" " " selected-region "\n"))
-                         prompt))
+                         prompt
+                         (when selected-region (concat "\n" " " selected-region "\n"))))
              (inserted-text (chatgpt-arcana--query-api fp)))
         (when selected-region
           (if before
@@ -212,7 +230,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
       (erase-buffer)
       (chatgpt-arcana-chat-mode)
       (insert
-       (let* ((fp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "Selected region:\n"selected-region)))))
+       (let* ((fp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
          (concat
           (replace-regexp-in-string "^" "> " fp nil t)
           "\n\n-------\n\n"
@@ -258,7 +276,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
                    (key (concat "s" (substring (symbol-name identifier) 0 1)))
                    (command `(,key
                               (lambda () (interactive)
-                                (chatgpt-arcana-query-region ,(cdr prompt)))
+                                (chatgpt-arcana-query,(cdr prompt)))
                               ,label)))
               command))
           (cdr chatgpt-arcana-common-prompts-alist)))
@@ -268,13 +286,14 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
            ("Query"
             (("a" chatgpt-arcana-query "Query")
-             ("A" chatgpt-arcana-query-region "Query with region")
              ("r" chatgpt-arcana-replace-region "Replace region"))
             "Insert"
             (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
              ("I" chatgpt-arcana-insert-at-point "At point")
              ("j" chatgpt-arcana-insert-after-region "Before region")
              ("J" chatgpt-arcana-insert-before-region "After region"))
+            "Chat"
+            (("c" chatgpt-arcana-start-chat "Start chat"))
             "Shortcuts"
             (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
 
