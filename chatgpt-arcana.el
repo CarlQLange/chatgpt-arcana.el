@@ -15,6 +15,9 @@
 
 (require 'url)
 (require 'json)
+(require 'cl-lib)
+(require 'request)
+(require 'markdown-mode)
 
 (defgroup chatgpt-arcana nil
   "An Emacs package that uses the OpenAI API to write and modify code and text."
@@ -70,27 +73,35 @@
          (system-prompt (or (cdr (assoc prompt-identifier chatgpt-arcana-system-prompts-alist))
                             chatgpt-arcana-fallback-system-prompt)))
     (concat system-prompt " Current Emacs major mode: " mode-name ".")))
+(require 'request)
 
 (defun chatgpt-arcana--query-api (prompt)
   "Sends a query to the OpenAI API with PROMPT and returns the first message content."
-  (let* ((url-request-method "POST")
-         (url-request-data (json-encode `((model . ,chatgpt-arcana-model-name)
-                                          (messages . [((role . "user")
-                                                        (content . ,prompt))]))))
-         (url-request-extra-headers
-          `(("Content-Type" . "application/json")
-            ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key))))
-         (response (url-retrieve-synchronously chatgpt-arcana-api-endpoint)))
-    (with-current-buffer response
-      (goto-char url-http-end-of-headers)
-      (let* ((json-object-type 'hash-table)
-             (json-array-type 'list)
-             (json-key-type 'string))
-        (let* ((response-data (json-read))
-               (choices (gethash "choices" response-data))
-               (msg (gethash "message" (car choices)))
-               (content (gethash "content" msg)))
-          (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))))
+  (request
+    chatgpt-arcana-api-endpoint
+    :type "POST"
+    :data (json-encode `((model . ,chatgpt-arcana-model-name)
+                         (messages . [((role . "user")
+                                       (content . ,prompt))])))
+    :headers `(("Content-Type" . "application/json")
+               ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
+    :sync t
+    :parser (lambda ()
+              (let ((json-object-type 'hash-table)
+                    (json-array-type 'list)
+                    (json-key-type 'string))
+                (json-read)))
+    :encoding 'utf-8
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (message "aXXXX %S" (gethash "content" (gethash "message" (car (gethash "choices" data)))))
+                (let* ((choices (gethash "choices" data))
+                       (msg (gethash "message" (car choices)))
+                       (content (gethash "content" msg)))
+                  (message content)
+                  (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))
+    :error (lambda (error-thrown)
+             (message "Error: %S" error-thrown))))
 
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
@@ -180,26 +191,26 @@
                    (label (capitalize (symbol-name identifier)))
                    (key (concat "s" (substring (symbol-name identifier) 0 1)))
                    (command `(,key
-                               (lambda () (interactive)
-                                 (chatgpt-arcana-query-region ,(cdr prompt)))
-                               ,label)))
+                              (lambda () (interactive)
+                                (chatgpt-arcana-query-region ,(cdr prompt)))
+                              ,label)))
               command))
           (cdr chatgpt-arcana-common-prompts-alist)))
 
 (use-package pretty-hydra
   :config
   (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
-    ("Query"
-     (("a" chatgpt-arcana-query "Query")
-      ("A" chatgpt-arcana-query-region "Query with region")
-      ("r" chatgpt-arcana-replace-region "Replace region"))
-     "Insert"
-     (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
-      ("I" chatgpt-arcana-insert-at-point "At point")
-      ("j" chatgpt-arcana-insert-after-region "Before region")
-      ("J" chatgpt-arcana-insert-before-region "After region"))
-     "Shortcuts"
-     (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
+           ("Query"
+            (("a" chatgpt-arcana-query "Query")
+             ("A" chatgpt-arcana-query-region "Query with region")
+             ("r" chatgpt-arcana-replace-region "Replace region"))
+            "Insert"
+            (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
+             ("I" chatgpt-arcana-insert-at-point "At point")
+             ("j" chatgpt-arcana-insert-after-region "Before region")
+             ("J" chatgpt-arcana-insert-before-region "After region"))
+            "Shortcuts"
+            (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
 
 
 (provide 'chatgpt-arcana)
