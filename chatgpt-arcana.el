@@ -28,6 +28,8 @@
   :type 'string
   :group 'chatgpt-arcana)
 
+(defvar chatgpt-arcana-chat-separator "-------")
+
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
 (defcustom chatgpt-arcana-model-name "gpt-3.5-turbo"
@@ -74,11 +76,6 @@
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
-(defcustom chatgpt-arcana-chat-last-lines 200
-  "Number of last lines in the buffer to send in a chat as context. Has cost implications."
-  :type 'integer
-  :group 'chatgpt-arcana)
-
 (define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
   (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end)
@@ -117,8 +114,37 @@
                          (msg (gethash "message" (car choices)))
                          (content (gethash "content" msg)))
                     (setq out (replace-regexp-in-string "[“”‘’]" "`" (string-trim content))))))
-      :error (lambda (error-thrown)
+      :error (lambda (error-thrown )
                (message "Error: %S" error-thrown)))
+    out))
+
+(defun chatgpt-arcana--query-api-alist (messages-alist)
+  "Query the OpenAI API with formatted MESSAGES-ALIST.
+The JSON should be a list of messages like (:role , role :content ,content)"
+  (message "%S" (json-encode messages-alist))
+  (let ((out))
+    (request
+      chatgpt-arcana-api-endpoint
+      :type "POST"
+      :data (json-encode `(:model ,chatgpt-arcana-model-name
+                           :messages ,messages-alist))
+      :headers `(("Content-Type" . "application/json")
+                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
+      :sync t
+      :parser (lambda ()
+                (let ((json-object-type 'hash-table)
+                      (json-array-type 'list)
+                      (json-key-type 'string))
+                  (json-read)))
+      :encoding 'utf-8
+      :success (cl-function
+                (lambda (&key response &allow-other-keys)
+                  (let* ((choices (gethash "choices" (request-response-data response)))
+                         (msg (gethash "message" (car choices)))
+                         (content (gethash "content" msg)))
+                    (setq out (replace-regexp-in-string "[“”‘’]" "`" (string-trim content))))))
+      :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+               (message "Error: %S" error-thrown))))
     out))
 
 (defun chatgpt-arcana-generate-buffer-name (&optional prefix temp)
@@ -142,12 +168,34 @@ If TEMP, adds asterisks to the name."
     (unless (get-buffer new-name)
       (rename-buffer new-name))))
 
+(defun chatgpt-arcana-chat-string-to-alist (chat-string)
+  "Transforms CHAT-STRING into a JSON array of chat messages."
+  (let ((messages '())
+        (regex "^-+\s*\\(.*\\):\s*$"))
+    (with-temp-buffer
+      (insert chat-string)
+      (goto-char (point-min))
+      (while (search-forward-regexp regex nil t)
+        (let* ((role (match-string-no-properties 1))
+               (start (point))
+               (end (when (save-excursion (search-forward-regexp regex nil t))
+                      (match-beginning 0)))
+               (content (buffer-substring-no-properties start (or end (point-max)))))
+          (push `((role . ,role) (content . ,(string-trim content))) messages))))
+    (reverse messages)))
+
+(defun chatgpt-arcana-chat-buffer-to-alist ()
+  "Transforms the current buffer into a JSON array of chat messages."
+  (interactive)
+  (let ((chat-string (buffer-string)))
+    (chatgpt-arcana-chat-string-to-alist chat-string)))
+
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
   (interactive "sPrompt: ")
   (let*
-      ((selected-region (and (use-region-p) (buffer-substring (mark) (point))))
+      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point))))
        (system-prompt (chatgpt-arcana-get-system-prompt)))
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
@@ -155,7 +203,7 @@ If TEMP, adds asterisks to the name."
       (chatgpt-arcana-chat-mode)
       (insert
        (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
-         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n-------\n\n" (chatgpt-arcana--query-api fp))))
+         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n" chatgpt-arcana-chat-separator " assistant:\n\n" (chatgpt-arcana--query-api fp))))
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (split-window-horizontally)
         (switch-to-buffer "*chatgpt-arcana-response*")))))
@@ -164,7 +212,7 @@ If TEMP, adds asterisks to the name."
 (defun chatgpt-arcana-replace-region (prompt)
   "Send the selected region to the OpenAI API with PROMPT and replace the region with the output."
   (interactive "sPrompt: ")
-  (let ((selected-region (buffer-substring (mark) (point))))
+  (let ((selected-region (buffer-substring-no-properties (mark) (point))))
     (deactivate-mark)
     (let ((modified-region (chatgpt-arcana--query-api (concat (chatgpt-arcana-get-system-prompt) "\n" prompt " " selected-region))))
       (delete-region (mark) (point))
@@ -178,7 +226,7 @@ and insert the output before/after the region or at point.
 With optional argument BEFORE set to true, insert the output before the region.
 With optional argument IGNORE-REGION, don't pay attention to the selected region."
   (let ((selected-region (if (and (region-active-p) (not ignore-region))
-                             (buffer-substring (mark) (point))
+                             (buffer-substring-no-properties (mark) (point))
                            nil)))
     (deactivate-mark)
     (save-excursion
@@ -234,17 +282,26 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   "Start a chat with PROMPT"
   (interactive "sPrompt: ")
   (let*
-      ((selected-region (and (use-region-p) (buffer-substring (mark) (point)))))
+      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point)))))
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
       (erase-buffer)
       (chatgpt-arcana-chat-mode)
       (insert
-       (let* ((fp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
+       (let* (
+              (sp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown." "\n\n"))
+              (fp (concat
+                   chatgpt-arcana-chat-separator
+                   " system:\n\n"
+                   sp
+                   chatgpt-arcana-chat-separator
+                   " user:\n\n"
+                   prompt (and selected-region (concat "\n\n"selected-region)) "\n\n")))
          (concat
-          (replace-regexp-in-string "^" "> " fp nil t)
-          "\n\n-------\n\n"
-          (chatgpt-arcana--query-api fp))))
+          fp
+          chatgpt-arcana-chat-separator
+          " assistant:\n\n"
+          (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-string-to-alist fp)))))
       (chatgpt-arcana-chat-start-new-chat-response)
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (split-window-horizontally)
@@ -255,28 +312,19 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   (with-current-buffer (buffer-name)
     (goto-char (point-max))
     (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
-      (insert "\n\n-------\n\n"))
-    (insert "> ")
+      (insert "\n\n" chatgpt-arcana-chat-separator " user:\n\n"))
     (goto-char (point-max))))
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
-  "Send the current buffer and insert the response at the end - useful for chatting."
+  "Send the current chat buffer and insert the response at the end."
   (interactive)
   (save-excursion
-    (goto-char (point-max))
-    (dotimes (i chatgpt-arcana-chat-last-lines)
-      (forward-line -1))
-    (let ((selected-region (buffer-substring (point) (point-max))))
-      (deactivate-mark)
-      (let* ((fp (concat (chatgpt-arcana-get-system-prompt)
-                         "\nA chat session follows. User input is marked with >.\n\n"
-                         selected-region))
-             (inserted-text (chatgpt-arcana--query-api fp)))
-        (goto-char (point-max))
-        (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
-          (setq inserted-text (concat "\n\n-------\n\n" inserted-text)))
-        (insert inserted-text)
-        (chatgpt-arcana-chat-start-new-chat-response))))
+    (let* ((inserted-text (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-buffer-to-alist))))
+      (goto-char (point-max))
+      (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
+        (setq inserted-text (concat "\n\n" chatgpt-arcana-chat-separator " assistant:\n\n" inserted-text)))
+      (insert inserted-text)
+      (chatgpt-arcana-chat-start-new-chat-response)))
   (goto-char (point-max)))
 
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
