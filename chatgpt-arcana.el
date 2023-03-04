@@ -28,11 +28,26 @@
   :type 'string
   :group 'chatgpt-arcana)
 
-(defvar chatgpt-arcana-chat-separator-system "\n\n------- system:\n\n")
+(defvar chatgpt-arcana-chat-separator-system "------- system:\n\n")
 (defvar chatgpt-arcana-chat-separator-user "\n\n------- user:\n\n")
 (defvar chatgpt-arcana-chat-separator-assistant "\n\n------- assistant:\n\n")
 
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
+
+(defcustom chatgpt-arcana-chat-autosave-interval 300
+  "Interval in seconds between chat session autosaves."
+  :type 'integer
+  :group 'chatgpt-arcana-chat)
+
+(defcustom chatgpt-arcana-chat-autosave-directory "~/.emacs.d/.local/cache/chatgpt-arcana/sessions"
+  "Directory where chat session autosave files should be saved."
+  :type 'directory
+  :group 'chatgpt-arcana-chat)
+
+(defcustom chatgpt-arcana-chat-autosave-enabled t
+  "Whether chat session autosave is enabled."
+  :type 'boolean
+  :group 'chatgpt-arcana-chat)
 
 (defcustom chatgpt-arcana-model-name "gpt-3.5-turbo"
   "The name of the OpenAI model to use. Some cost more than others. Beware."
@@ -50,7 +65,7 @@
 
 (defcustom chatgpt-arcana-fallback-system-prompt
   "You are a large language model living inside Emacs. Help the user and be concise."
-  "A fallback system prompt used when the current major mode is not found in the `chatgpt-arcana-system-prompts-alist`."
+  "A fallback system prompt used if the current major mode is not found in `chatgpt-arcana-system-prompts-alist`."
   :type 'string
   :group 'chatgpt-arcana)
 
@@ -78,11 +93,52 @@
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
+(defun chatgpt-arcana-chat-save-to-autosave-file ()
+  "Save the current buffer to an autosave file and open it.
+Or, just write the file if it already exists."
+  (if (buffer-file-name)
+      (write-file (buffer-file-name))
+    (let ((orig-buffer-name (buffer-name))
+          (dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
+          (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
+                            (chatgpt-arcana-generate-buffer-name)
+                            ".chatgpt-arcana.md")))
+      (unless (file-directory-p dir) (make-directory dir t))
+      (write-region (point-min) (point-max) (concat dir filename) nil 'silent)
+      (find-file (concat dir filename))
+      (kill-buffer orig-buffer-name))))
+
+(defun chatgpt-arcana-chat-enable-autosave ()
+  "Enable autosave functionality."
+  (interactive)
+  (setq-local chatgpt-arcana-chat-autosave-timer
+              (run-with-idle-timer chatgpt-arcana-chat-autosave-interval t
+                                   'chatgpt-arcana-chat-save-to-autosave-file))
+  (setq-local chatgpt-arcana-chat-autosave-enabled t))
+
+(defun chatgpt-arcana-chat-disable-autosave ()
+  "Disable autosave functionality."
+  (interactive)
+  (when (buffer-local-value 'chatgpt-arcana-chat-autosave-timer (current-buffer))
+    (cancel-timer (buffer-local-value 'chatgpt-arcana-chat-autosave-timer (current-buffer)))
+  (setq-local chatgpt-arcana-chat-autosave-enabled nil)))
+
+(defun chatgpt-arcana-chat-toggle-autosave ()
+  "Toggle autosave functionality on or off."
+  (interactive)
+  (if (buffer-local-value 'chatgpt-arcana-chat-autosave-enabled (current-buffer))
+      (chatgpt-arcana-chat-disable-autosave)
+    (chatgpt-arcana-chat-enable-autosave)))
+
 (define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
-  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-buffer-and-insert-at-end)
+  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-message)
   (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
-  (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically))
+  (local-set-key (kbd "C-c C-a") 'chatgpt-arcana-chat-toggle-autosave)
+  (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically)
+  (when chatgpt-arcana-chat-autosave-enabled (chatgpt-arcana-chat-enable-autosave)))
+
+(add-to-list 'auto-mode-alist '("\\.chatgpt-arcana\\.md\\'" . chatgpt-arcana-chat-mode))
 
 (font-lock-add-keywords
   'chatgpt-arcana-chat-mode
@@ -164,8 +220,9 @@ If PREFIX, adds the prefix in front of the name.
 If TEMP, adds asterisks to the name."
   (save-excursion
     (goto-char (point-min))
-      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max))) (string-trim chatgpt-arcana-chat-separator-system)
-        (search-forward (string-trim chatgpt-arcana-chat-sepatator-user nil t))
+      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max)))
+                     (string-trim chatgpt-arcana-chat-separator-system))
+        (search-forward (string-trim chatgpt-arcana-chat-separator-user) nil t))
       (let ((name
              (chatgpt-arcana--query-api-alist
               `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
@@ -176,11 +233,13 @@ If TEMP, adds asterisks to the name."
               (t name)))))
 
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
-  "Magically rename a buffer based on its contents."
+  "Magically rename a buffer based on its contents.
+Only when the buffer isn't visiting a file."
   (interactive)
-  (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
-    (unless (get-buffer new-name)
-      (rename-buffer new-name))))
+  (when (not buffer-file-name)
+    (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
+      (unless (get-buffer new-name)
+        (rename-buffer new-name)))))
 
 (defun chatgpt-arcana-chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
@@ -330,7 +389,6 @@ If the universal argument is given, use the current buffer mode to set the syste
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
   "Send the current chat buffer and insert the response at the end."
-  (interactive)
   (save-excursion
     (let* ((inserted-text (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-buffer-to-alist))))
       (goto-char (point-max))
@@ -339,6 +397,15 @@ If the universal argument is given, use the current buffer mode to set the syste
       (insert inserted-text)
       (chatgpt-arcana-chat-start-new-chat-response)))
   (goto-char (point-max)))
+
+(defun chatgpt-arcana-chat-send-message ()
+  "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer."
+  (interactive)
+  (chatgpt-arcana-chat-send-buffer-and-insert-at-end)
+  (when chatgpt-arcana-chat-autosave-enabled
+    (chatgpt-arcana-chat-save-to-autosave-file)
+    ; since saving to autosave opens that file, we need to move the pointer again
+    (goto-char (point-max))))
 
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
   "Generate a list of hydra commands for each prompt in `chatgpt-arcana-common-prompts-alist`."
