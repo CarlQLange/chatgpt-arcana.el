@@ -278,17 +278,19 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
 
 ;;;###autoload
 (defun chatgpt-arcana-start-chat (prompt)
-  "Start a chat with PROMPT"
+  "Start a chat with PROMPT.
+If the universal argument is given, use the current buffer mode to set the system prompt."
   (interactive "sPrompt: ")
   (let*
-      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point)))))
+      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point))))
+       (system-prompt (chatgpt-arcana-get-system-prompt)))
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
       (erase-buffer)
       (chatgpt-arcana-chat-mode)
       (insert
        (let* (
-              (sp (concat (chatgpt-arcana-get-system-prompt) " Respond in well-formatted markdown, with headers, tables, lists, and so on." "\n\n"))
+              (sp (concat (if current-prefix-arg system-prompt (chatgpt-arcana-get-system-prompt)) " Respond in well-formatted markdown, with headers, tables, lists, and so on." "\n\n"))
               (fp (concat
                    chatgpt-arcana-chat-separator
                    " system:\n\n"
