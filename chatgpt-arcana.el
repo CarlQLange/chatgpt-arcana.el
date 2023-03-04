@@ -28,7 +28,9 @@
   :type 'string
   :group 'chatgpt-arcana)
 
-(defvar chatgpt-arcana-chat-separator "-------")
+(defvar chatgpt-arcana-chat-separator-system "\n\n------- system:\n\n")
+(defvar chatgpt-arcana-chat-separator-user "\n\n------- user:\n\n")
+(defvar chatgpt-arcana-chat-separator-assistant "\n\n------- assistant:\n\n")
 
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
@@ -162,8 +164,8 @@ If PREFIX, adds the prefix in front of the name.
 If TEMP, adds asterisks to the name."
   (save-excursion
     (goto-char (point-min))
-      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max))) "------- system:")
-        (search-forward "------- user:" nil t))
+      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max))) (string-trim chatgpt-arcana-chat-separator-system)
+        (search-forward (string-trim chatgpt-arcana-chat-sepatator-user nil t))
       (let ((name
              (chatgpt-arcana--query-api-alist
               `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
@@ -215,7 +217,7 @@ If TEMP, adds asterisks to the name."
       (chatgpt-arcana-chat-mode)
       (insert
        (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
-         (concat (replace-regexp-in-string "^" "> " fp nil t) "\n\n" chatgpt-arcana-chat-separator " assistant:\n\n" (chatgpt-arcana--query-api fp))))
+         (concat (replace-regexp-in-string "^" "> " fp nil t) chatgpt-arcana-chat-separator-assistant "" (chatgpt-arcana--query-api fp))))
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (split-window-horizontally)
         (switch-to-buffer "*chatgpt-arcana-response*")))))
@@ -303,18 +305,15 @@ If the universal argument is given, use the current buffer mode to set the syste
       (chatgpt-arcana-chat-mode)
       (insert
        (let* (
-              (sp (concat (if current-prefix-arg system-prompt (chatgpt-arcana-get-system-prompt)) " Respond in well-formatted markdown, with headers, tables, lists, and so on." "\n\n"))
+              (sp (concat (if current-prefix-arg system-prompt (chatgpt-arcana-get-system-prompt)) " Respond in well-formatted markdown, with headers, tables, lists, and so on."))
               (fp (concat
-                   chatgpt-arcana-chat-separator
-                   " system:\n\n"
+                   chatgpt-arcana-chat-separator-system
                    sp
-                   chatgpt-arcana-chat-separator
-                   " user:\n\n"
-                   prompt (and selected-region (concat "\n\n"selected-region)) "\n\n")))
+                   chatgpt-arcana-chat-separator-user
+                   prompt (and selected-region (concat "\n\n"selected-region)))))
          (concat
           fp
-          chatgpt-arcana-chat-separator
-          " assistant:\n\n"
+          chatgpt-arcana-chat-separator-assistant
           (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-string-to-alist fp)))))
       (chatgpt-arcana-chat-start-new-chat-response)
       (unless (get-buffer-window "*chatgpt-arcana-response*")
@@ -326,7 +325,7 @@ If the universal argument is given, use the current buffer mode to set the syste
   (with-current-buffer (buffer-name)
     (goto-char (point-max))
     (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
-      (insert "\n\n" chatgpt-arcana-chat-separator " user:\n\n"))
+      (insert chatgpt-arcana-chat-separator-user))
     (goto-char (point-max))))
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
@@ -336,7 +335,7 @@ If the universal argument is given, use the current buffer mode to set the syste
     (let* ((inserted-text (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-buffer-to-alist))))
       (goto-char (point-max))
       (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
-        (setq inserted-text (concat "\n\n" chatgpt-arcana-chat-separator " assistant:\n\n" inserted-text)))
+        (setq inserted-text (concat chatgpt-arcana-chat-separator-assistant inserted-text)))
       (insert inserted-text)
       (chatgpt-arcana-chat-start-new-chat-response)))
   (goto-char (point-max)))
