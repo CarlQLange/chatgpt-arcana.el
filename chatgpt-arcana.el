@@ -87,6 +87,11 @@
   '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
     ("^--[-]+" . font-lock-comment-face)))
 
+(use-package all-the-icons
+  :config
+  (add-to-list 'all-the-icons-mode-icon-alist
+                '(chatgpt-arcana-chat-mode all-the-icons-octicon "comment-discussion" :height 1.0 :v-adjust -0.1 :face all-the-icons-purple)))
+
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
   (let* ((mode-name (symbol-name major-mode))
