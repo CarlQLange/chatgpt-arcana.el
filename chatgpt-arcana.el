@@ -82,6 +82,11 @@
   (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
   (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically))
 
+(font-lock-add-keywords
+  'chatgpt-arcana-chat-mode
+  '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
+    ("^--[-]+" . font-lock-comment-face)))
+
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
   (let* ((mode-name (symbol-name major-mode))
