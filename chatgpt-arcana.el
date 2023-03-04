@@ -53,7 +53,7 @@
   :group 'chatgpt-arcana)
 
 (defcustom chatgpt-arcana-generated-buffer-name-prompt
-  "Generate a useful and descriptive name based on this content. The name should be unique to the input, lowercase, hyphenated, not contain the words buffer or chatgpt, not too short. RESPOND ONLY WITH THE NAME. File content follows.\n"
+  "Generate a useful and descriptive Emacs buffer name based on this content. The name should be lowercase, hyphenated, not too short. RESPOND ONLY WITH THE NAME.\n"
   "Prompt used to generate buffer names."
   :type 'string
   :group 'chatgpt-arcana)
