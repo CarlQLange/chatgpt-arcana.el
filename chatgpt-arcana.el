@@ -288,7 +288,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
       (chatgpt-arcana-chat-mode)
       (insert
        (let* (
-              (sp (concat (chatgpt-arcana-get-system-prompt) " Respond in markdown." "\n\n"))
+              (sp (concat (chatgpt-arcana-get-system-prompt) " Respond in well-formatted markdown, with headers, tables, lists, and so on." "\n\n"))
               (fp (concat
                    chatgpt-arcana-chat-separator
                    " system:\n\n"
