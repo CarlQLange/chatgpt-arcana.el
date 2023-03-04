@@ -150,15 +150,18 @@ The JSON should be a list of messages like (:role , role :content ,content)"
   "Generate a buffer name based on the first characters of the buffer.
 If PREFIX, adds the prefix in front of the name.
 If TEMP, adds asterisks to the name."
-  (let ((name
-         (chatgpt-arcana--query-api
-          (concat
-           chatgpt-arcana-generated-buffer-name-prompt
-           (substring (buffer-substring-no-properties (1+ (string-match "\n" (buffer-string))) (min 1200 (point-max))))))))
-    (cond ((and prefix temp) (concat "*" prefix name "*"))
-          (prefix (concat prefix "-" name))
-          (temp (concat "*" name "*"))
-          (t name))))
+  (save-excursion
+    (goto-char (point-min))
+      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max))) "------- system:")
+        (search-forward "------- user:" nil t))
+      (let ((name
+             (chatgpt-arcana--query-api-alist
+              `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
+                ((role . "user") (content . ,(buffer-substring-no-properties (point) (min (+ 1200 (point)) (point-max)))))))))
+        (cond ((and prefix temp) (concat "*" prefix name "*"))
+              (prefix (concat prefix "-" name))
+              (temp (concat "*" name "*"))
+              (t name)))))
 
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
   "Magically rename a buffer based on its contents."
