@@ -436,6 +436,11 @@ If the universal argument is given, use the current buffer mode to set the syste
             "Shortcuts"
             (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
 
+(map! :leader
+      :prefix ("[" . "ChatGPT")
+      :desc "Start chat" :g "c" #'chatgpt-arcana-start-chat
+      :desc "Start chat" :g "[" #'chatgpt-arcana-start-chat
+      :desc "Open Hydra" :g "h" #'chatgpt-arcana-hydra/body)
 
 (provide 'chatgpt-arcana)
 
