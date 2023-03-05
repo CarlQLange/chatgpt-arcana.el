@@ -19,6 +19,18 @@ https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-99
 #### Have a lovely chat
 https://user-images.githubusercontent.com/859820/222718608-b767a663-86f9-4c56-acbe-192e1e91fe26.mp4
 
+## Usage
+
+There are various interactive functions available. Some of them even work.
+
+This package, for now, provides the following functionality:
+
+- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat` (this is the best part of this package).
+- Generate text content based on prompt and optionally selected region using `chatgpt-arcana-query`
+- Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
+- Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
+- Insert generated text at, after or before selected text region using `chatgpt-arcana-insert-after-region` and `chatgpt-arcana-insert-before-region` and `chatgpt-arcana-insert-at-point`
+
 ## Installation
 
 ChatGPT-Arcana isn’t on melpa or elpa. You can use use-package to install from github:
@@ -29,20 +41,44 @@ ChatGPT-Arcana isn’t on melpa or elpa. You can use use-package to install from
   :init (setq chatgpt-arcana-api-key "your-api-key-here"))
 ```
 
+My own config adds a few extra parts that don't need to be part of the package.
+
+```elisp
+(use-package chatgpt-arcana
+  :straight (:host github :repo "CarlQLange/ChatGPT-Arcana.el" :files ("*.el"))
+  :init (setq chatgpt-arcana-api-key "your-api-key-here")
+  :config 
+  (use-package all-the-icons
+    :config
+    (add-to-list 'all-the-icons-mode-icon-alist
+                 '(chatgpt-arcana-chat-mode all-the-icons-octicon "comment-discussion" :height 1.0 :v-adjust -0.1 :face all-the-icons-purple)))
+
+  (use-package pretty-hydra
+    :config
+    (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
+             ("Query"
+              (("a" chatgpt-arcana-query "Query")
+               ("r" chatgpt-arcana-replace-region "Replace region"))
+              "Insert"
+              (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
+               ("I" chatgpt-arcana-insert-at-point "At point")
+               ("j" chatgpt-arcana-insert-after-region "Before region")
+               ("J" chatgpt-arcana-insert-before-region "After region"))
+              "Chat"
+              (("c" chatgpt-arcana-start-chat "Start chat"))
+              "Shortcuts"
+              (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
+
+  (map! :leader
+        :prefix ("[" . "ChatGPT")
+        :desc "Start chat" :g "c" #'chatgpt-arcana-start-chat
+        :desc "Start chat" :g "[" #'chatgpt-arcana-start-chat
+        :desc "Open Hydra" :g "h" #'chatgpt-arcana-hydra/body))
+```
+
+You are going to want to add a keymap of your own, that's for sure :)
+
 I have to stress at this point that this package is very new, and I only wrote it to scratch an itch. Sorry if it turns you into a chicken or something.
-
-## Usage
-
-There are various interactive functions available. Some of them even work.
-
-This package, for now, provides the following functionality:
-
-- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat`.
-- Generate text content based on prompt and optionally selected region using `chatgpt-arcana-query`
-- Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
-- Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
-- Insert generated text at, after or before selected text region using `chatgpt-arcana-insert-after-region` and `chatgpt-arcana-insert-before-region` and `chatgpt-arcana-insert-at-point`
-- Generate custom shortcuts for a hydra of frequently used prompts using `chatgpt-arcana-generate-prompt-shortcuts()` 
 
 ## Requirements
 

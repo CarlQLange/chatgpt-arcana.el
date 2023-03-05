@@ -145,11 +145,6 @@ Or, just write the file if it already exists."
   '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
     ("^--[-]+" . font-lock-comment-face)))
 
-(use-package all-the-icons
-  :config
-  (add-to-list 'all-the-icons-mode-icon-alist
-                '(chatgpt-arcana-chat-mode all-the-icons-octicon "comment-discussion" :height 1.0 :v-adjust -0.1 :face all-the-icons-purple)))
-
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
   (let* ((mode-name (symbol-name major-mode))
@@ -419,28 +414,6 @@ If the universal argument is given, use the current buffer mode to set the syste
                               ,label)))
               command))
           (cdr chatgpt-arcana-common-prompts-alist)))
-
-(use-package pretty-hydra
-  :config
-  (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
-           ("Query"
-            (("a" chatgpt-arcana-query "Query")
-             ("r" chatgpt-arcana-replace-region "Replace region"))
-            "Insert"
-            (("i" chatgpt-arcana-insert-at-point-with-context "At point with context")
-             ("I" chatgpt-arcana-insert-at-point "At point")
-             ("j" chatgpt-arcana-insert-after-region "Before region")
-             ("J" chatgpt-arcana-insert-before-region "After region"))
-            "Chat"
-            (("c" chatgpt-arcana-start-chat "Start chat"))
-            "Shortcuts"
-            (,@(chatgpt-arcana-generate-prompt-shortcuts))))))
-
-(map! :leader
-      :prefix ("[" . "ChatGPT")
-      :desc "Start chat" :g "c" #'chatgpt-arcana-start-chat
-      :desc "Start chat" :g "[" #'chatgpt-arcana-start-chat
-      :desc "Open Hydra" :g "h" #'chatgpt-arcana-hydra/body)
 
 (provide 'chatgpt-arcana)
 
