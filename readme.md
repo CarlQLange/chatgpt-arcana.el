@@ -30,6 +30,8 @@ This package, for now, provides the following functionality:
 - Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
 - Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
 - Insert generated text at, after or before selected text region using `chatgpt-arcana-insert-after-region` and `chatgpt-arcana-insert-before-region` and `chatgpt-arcana-insert-at-point`
+- Chat buffer auto-naming (modify prompt with custom var `chatgpt-arcana-generated-buffer-name-prompt`)
+- Chat session autosave and automatic file naming (disable with custom var`chatgpt-arcana-chat-autosave-enabled`, modify save directory with `chatgpt-arcana-chat-autosave-directory`)
 
 ## Installation
 
