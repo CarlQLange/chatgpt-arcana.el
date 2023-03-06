@@ -96,7 +96,7 @@
 (defun chatgpt-arcana-chat-save-to-autosave-file ()
   "Save the current buffer to an autosave file and open it.
 Or, just write the file if it already exists."
-  (if (buffer-file-name)
+  (if (and (buffer-file-name) (equal (symbol-name major-mode) "chatgpt-arcana-major-mode"))
       (write-file (buffer-file-name))
     (let ((orig-buffer-name (buffer-name))
           (dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
