@@ -70,7 +70,19 @@
   :group 'chatgpt-arcana)
 
 (defcustom chatgpt-arcana-generated-buffer-name-prompt
-  "Generate a useful and descriptive Emacs buffer name based on this content. The name should be lowercase, hyphenated, not too short. RESPOND ONLY WITH THE NAME.\n"
+  "You are an Emacs function that generate a useful and descriptive Emacs buffer name based on this content. The name should be lowercase, hyphenated, not too long.
+
+YOU MAY RESPOND ONLY WITH THE NAME AND NO OTHER TEXT.
+
+Example Input: Create a poem about a pear
+Example Output: pear-poem
+Bad output might include: emacs-buffer-poem, emacs-pear-poem, pear-poem-buffer
+Example Input: Fix this large code block. The function is named some-function
+Example Output: fixing-some-function
+Bad output might include: buffer-fix-some-function, emacs-buffer-fix-some-function
+
+Input follows. Don't forget - ONLY respond with the buffer name and no other text.
+"
   "Prompt used to generate buffer names."
   :type 'string
   :group 'chatgpt-arcana)
