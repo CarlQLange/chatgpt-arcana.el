@@ -34,11 +34,6 @@
 
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
-(defcustom chatgpt-arcana-chat-autosave-interval 300
-  "Interval in seconds between chat session autosaves."
-  :type 'integer
-  :group 'chatgpt-arcana-chat)
-
 (defcustom chatgpt-arcana-chat-autosave-directory "~/.emacs.d/.local/cache/chatgpt-arcana/sessions"
   "Directory where chat session autosave files should be saved."
   :type 'directory
@@ -121,19 +116,14 @@ Or, just write the file if it already exists."
       (kill-buffer orig-buffer-name))))
 
 (defun chatgpt-arcana-chat-enable-autosave ()
-  "Enable autosave functionality."
+  "Enable autosave functionality. This will save the file after every sent message."
   (interactive)
-  (setq-local chatgpt-arcana-chat-autosave-timer
-              (run-with-idle-timer chatgpt-arcana-chat-autosave-interval t
-                                   'chatgpt-arcana-chat-save-to-autosave-file))
   (setq-local chatgpt-arcana-chat-autosave-enabled t))
 
 (defun chatgpt-arcana-chat-disable-autosave ()
   "Disable autosave functionality."
   (interactive)
-  (when (buffer-local-value 'chatgpt-arcana-chat-autosave-timer (current-buffer))
-    (cancel-timer (buffer-local-value 'chatgpt-arcana-chat-autosave-timer (current-buffer)))
-  (setq-local chatgpt-arcana-chat-autosave-enabled nil)))
+  (setq-local chatgpt-arcana-chat-autosave-enabled nil))
 
 (defun chatgpt-arcana-chat-toggle-autosave ()
   "Toggle autosave functionality on or off."
