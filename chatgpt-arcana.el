@@ -386,14 +386,6 @@ If the universal argument is given, use the current buffer mode to set the syste
 
 ;;;###autoload
 (defun chatgpt-arcana-resume-chat ()
-  "Resume a previous chat."
-  (interactive)
-  (let* ((buf (find-file-noselect chatgpt-arcana-chat-autosave-directory))
-         (win (display-buffer buf)))
-    (set-window-point win (point-max))))
-
-;;;###autoload
-(defun chatgpt-arcana-resume-chat ()
   "Resume a previous chat in the `chatgpt-arcana-chat-autosave-directory'.
 The directory is expected to contain files with the extension `.chatgpt-arcana.md'.
 The function will prompt the user to select a file to resume the chat,
