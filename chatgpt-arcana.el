@@ -376,6 +376,14 @@ If the universal argument is given, use the current buffer mode to set the syste
         (split-window-horizontally)
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
+(defun chatgpt-arcana-chat-start-new-chat-response ()
+  "Add dividing lines and user input prompt to a buffer."
+  (with-current-buffer (buffer-name)
+    (goto-char (point-max))
+    (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
+      (insert chatgpt-arcana-chat-separator-user))
+    (goto-char (point-max))))
+
 ;;;###autoload
 (defun chatgpt-arcana-resume-chat ()
   "Resume a previous chat."
