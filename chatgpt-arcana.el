@@ -386,13 +386,29 @@ If the universal argument is given, use the current buffer mode to set the syste
         (split-window-horizontally)
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
-(defun chatgpt-arcana-chat-start-new-chat-response ()
-  "Add dividing lines and user input prompt to a buffer."
-  (with-current-buffer (buffer-name)
-    (goto-char (point-max))
-    (unless (string-match-p "\n\n[-]+\n\n" (buffer-substring-no-properties (- (point-max) 10) (point-max)))
-      (insert chatgpt-arcana-chat-separator-user))
-    (goto-char (point-max))))
+;;;###autoload
+(defun chatgpt-arcana-resume-chat ()
+  "Resume a previous chat."
+  (interactive)
+  (let* ((buf (find-file-noselect chatgpt-arcana-chat-autosave-directory))
+         (win (display-buffer buf)))
+    (set-window-point win (point-max))))
+
+;;;###autoload
+(defun chatgpt-arcana-resume-chat ()
+  "Resume a previous chat in the `chatgpt-arcana-chat-autosave-directory'.
+The directory is expected to contain files with the extension `.chatgpt-arcana.md'.
+The function will prompt the user to select a file to resume the chat,
+using a built-in file picker.
+If the user cancels the picker, the function will do nothing.
+If no matching files are found, the function will display an error message."
+  (interactive)
+  (let* ((dir chatgpt-arcana-chat-autosave-directory)
+         (files (directory-files dir nil "\\.chatgpt-arcana\\.md$" t))
+         (file (completing-read "Select file to resume discussion: " files nil t)))
+    (when (not (equal file ""))
+      (find-file (expand-file-name file dir))
+      (goto-char (point-max)))))
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
   "Send the current chat buffer and insert the response at the end."
