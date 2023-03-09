@@ -263,6 +263,14 @@ Only when the buffer isn't visiting a file."
   (let ((chat-string (buffer-string)))
     (chatgpt-arcana-chat-string-to-alist chat-string)))
 
+;;#TODO refactor the below functions:
+;; - chatgpt-arcana-query
+;; - chatgpt-arcana-replace-region
+;; - chatgpt-arcana-insert-after-region
+;; - chatgpt-arcana-insert-before-region
+;; - chatgpt-arcana-insert-at-point
+;; - chatgpt-arcana-insert-at-point-with-context
+
 ;;;###autoload
 (defun chatgpt-arcana-query (prompt)
   "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
@@ -353,7 +361,8 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
 ;;;###autoload
 (defun chatgpt-arcana-start-chat-with-system-prompt (system-prompt prompt)
   "Start a chat using SYSTEM-PROMPT as the initial prompt and PROMPT as first msg."
-  (interactive "sSystem Prompt: \nsPrompt: ")
+  (interactive (list (completing-read "System Prompt: " (mapcar #'cdr chatgpt-arcana-system-prompts-alist))
+                     (completing-read "Prompt: " (mapcar #'cdr chatgpt-arcana-common-prompts-alist))))
   (let*
       ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point)))))
     (deactivate-mark)
@@ -383,8 +392,9 @@ If the universal argument is given, use the current buffer mode to set the syste
 Otherwise, use the chat prompt saved in `chatgpt-arcana-system-prompts-alist'.
 Use `chatgpt-arcana-start-chat-with-system-prompt' if you want to set the system prompt
 manually."
-  (interactive "sPrompt: ")
-  (let* ((system-prompt (chatgpt-arcana-get-system-prompt-for-mode-name (if current-prefix-arg major-mode 'chatgpt-arcana-chat-mode))))
+  (interactive (list (completing-read "Prompt: " (mapcar #'cdr chatgpt-arcana-common-prompts-alist))))
+  (let* ((system-prompt (chatgpt-arcana-get-system-prompt-for-mode-name
+                         (if current-prefix-arg major-mode 'chatgpt-arcana-chat-mode))))
     (chatgpt-arcana-start-chat-with-system-prompt system-prompt prompt)))
 
 (defun chatgpt-arcana-chat-start-new-chat-response ()
