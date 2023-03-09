@@ -23,15 +23,20 @@ https://user-images.githubusercontent.com/859820/222718608-b767a663-86f9-4c56-ac
 
 There are various interactive functions available. Some of them even work.
 
-This package, for now, provides the following functionality:
+### Functionality
 
-- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat` (this is the best part of this package).
-- Generate text content based on prompt and optionally selected region using `chatgpt-arcana-query`
-- Replace selected text region with generated text content using `chatgpt-arcana-replace-region`
-- Insert generated text at the current cursor position with informative context lines using `chatgpt-arcana-insert-at-point-with-context`
-- Insert generated text at, after or before selected text region using `chatgpt-arcana-insert-after-region` and `chatgpt-arcana-insert-before-region` and `chatgpt-arcana-insert-at-point`
-- Chat buffer auto-naming (modify prompt with custom var `chatgpt-arcana-generated-buffer-name-prompt`)
-- Chat session autosave and automatic file naming (disable with custom var`chatgpt-arcana-chat-autosave-enabled`, modify save directory with `chatgpt-arcana-chat-autosave-directory`)
+| Function                                                  | Description                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------ |
+| `chatgpt-arcana-chat-start-chat`                          | Chat with GPT in Emacs (this is the best part of this package) |
+| `chatgpt-arcana-query`                                   | Generate text content based on prompt and optionally selected region |
+| `chatgpt-arcana-replace-region`                           | Replace selected text region with generated text content     |
+| `chatgpt-arcana-insert-at-point-with-context`             | Insert generated text at the current cursor position with informative context lines |
+| `chatgpt-arcana-insert-after-region` / `chatgpt-arcana-insert-before-region` / `chatgpt-arcana-insert-at-point` | Insert generated text at, after or before selected text region |
+| `chatgpt-arcana-generated-buffer-name-prompt`            | Modify prompt for chat buffer auto-naming                    |
+| `chatgpt-arcana-chat-autosave-enabled` / `chatgpt-arcana-chat-autosave-directory` | Chat session autosave and automatic file naming options.     |
+
+Note that the above table provides a quick overview of each function, along with a brief description. For more detailed information on how to use each function, refer to the package's documentation.
+
 
 ## Installation
 
@@ -49,7 +54,7 @@ My own config adds a few extra parts that don't need to be part of the package.
 (use-package chatgpt-arcana
   :straight (:host github :repo "CarlQLange/ChatGPT-Arcana.el" :files ("*.el"))
   :init (setq chatgpt-arcana-api-key "your-api-key-here")
-  :config 
+  :config
   (use-package all-the-icons
     :config
     (add-to-list 'all-the-icons-mode-icon-alist
@@ -94,7 +99,7 @@ I have done exactly zero work in terms of compatibility. It works on my machine,
 
 ## Credits
 
-This package was developed by Carl Lange with judicious help from ChatGPT. 
+This package was developed by Carl Lange with judicious help from ChatGPT.
 
 ## License
 
