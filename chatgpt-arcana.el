@@ -34,7 +34,7 @@
 
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
-(defcustom chatgpt-arcana-chat-autosave-directory "~/.emacs.d/.local/cache/chatgpt-arcana/sessions"
+(defcustom chatgpt-arcana-chat-autosave-directory (concat user-emacs-directory ".local/cache/chatgpt-arcana/sessions")
   "Directory where chat session autosave files should be saved."
   :type 'directory
   :group 'chatgpt-arcana-chat)
@@ -145,16 +145,12 @@ Or, just write the file if it already exists."
            (re-search-backward "^```\\(.*\\)$" nil t)
            (match-string-no-properties 1))))
     (when lang
-      (let ((beg (save-excursion (re-search-backward "^```")))
-            (end (save-excursion (re-search-forward "^```" nil t))))
-        (save-excursion
-          (goto-char beg)
-          (forward-line)
-          (setq beg (point)))
-        (save-excursion
-          (goto-char end)
-          (setq end (+ (point) -3))
-        (kill-ring-save beg end))))))
+      (let ((beg (save-excursion
+                   (re-search-backward "^```")
+                   (forward-line)
+                   (point)))
+            (end (save-excursion (+ (re-search-forward "^```" nil t) -3))))
+        (kill-ring-save beg end)))))
 
 (add-to-list 'auto-mode-alist '("\\.chatgpt-arcana\\.md\\'" . chatgpt-arcana-chat-mode))
 
