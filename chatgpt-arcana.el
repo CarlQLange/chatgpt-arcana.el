@@ -133,8 +133,28 @@ Or, just write the file if it already exists."
   (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-message)
   (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
   (local-set-key (kbd "C-c C-a") 'chatgpt-arcana-chat-toggle-autosave)
+  (local-set-key (kbd "C-c C-b") 'chatgpt-arcana-chat-copy-code-block)
   (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically)
   (when chatgpt-arcana-chat-autosave-enabled (chatgpt-arcana-chat-enable-autosave)))
+
+(defun chatgpt-arcana-chat-copy-code-block ()
+  "Copy the code block at point, excluding the first and last lines."
+  (interactive)
+  (let ((lang
+         (save-excursion
+           (re-search-backward "^```\\(.*\\)$" nil t)
+           (match-string-no-properties 1))))
+    (when lang
+      (let ((beg (save-excursion (re-search-backward "^```")))
+            (end (save-excursion (re-search-forward "^```" nil t))))
+        (save-excursion
+          (goto-char beg)
+          (forward-line)
+          (setq beg (point)))
+        (save-excursion
+          (goto-char end)
+          (setq end (+ (point) -3))
+        (kill-ring-save beg end))))))
 
 (add-to-list 'auto-mode-alist '("\\.chatgpt-arcana\\.md\\'" . chatgpt-arcana-chat-mode))
 
