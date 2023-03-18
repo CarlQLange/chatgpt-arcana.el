@@ -96,6 +96,11 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
+(defcustom chatgpt-arcana-chat-split-window t
+  "Whether chat session starts in a split or not."
+  :type 'boolean
+  :group 'chatgpt-arcana-chat)
+
 (defun chatgpt-arcana-chat-save-to-autosave-file ()
   "Save the current buffer to an autosave file and open it.
 Or, just write the file if it already exists."
@@ -302,7 +307,8 @@ Only when the buffer isn't visiting a file."
        (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
          (concat (replace-regexp-in-string "^" "> " fp nil t) chatgpt-arcana-chat-separator-assistant "" (chatgpt-arcana--query-api fp))))
       (unless (get-buffer-window "*chatgpt-arcana-response*")
-        (split-window-horizontally)
+        (if chatgpt-arcana-chat-split-window
+            (split-window-horizontally))
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
 ;;;###autoload
@@ -398,7 +404,8 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
           (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-string-to-alist full-prompt)))))
       (chatgpt-arcana-chat-start-new-chat-response)
       (unless (get-buffer-window "*chatgpt-arcana-response*")
-        (split-window-horizontally)
+        (if chatgpt-arcana-chat-split-window
+            (split-window-horizontally))
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
 ;;;###autoload
