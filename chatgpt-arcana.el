@@ -35,7 +35,7 @@
 
 (defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
-(defcustom chatgpt-arcana-chat-autosave-directory (concat user-emacs-directory ".local/cache/chatgpt-arcana/sessions")
+(defcustom chatgpt-arcana-chat-autosave-directory (concat user-emacs-directory "chatgpt-arcana/sessions")
   "Directory where chat session autosave files should be saved."
   :type 'directory
   :group 'chatgpt-arcana-chat)
@@ -123,15 +123,12 @@ Or, just write the file if it already exists."
   (with-current-buffer buffer
     (if (and (buffer-file-name) (equal (symbol-name major-mode) "chatgpt-arcana-chat-mode"))
         (write-file (buffer-file-name))
-      (let ((orig-buffer-name (buffer-name))
-            (dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
+      (let ((dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
             (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
                               (chatgpt-arcana-generate-buffer-name-for-buffer buffer)
                              ".chatgpt-arcana.md")))
         (unless (file-directory-p dir) (make-directory dir t))
-        (write-region (point-min) (point-max) (concat dir filename) nil 'silent)
-        (find-file (concat dir filename))
-        (kill-buffer orig-buffer-name)))))
+        (write-file (concat dir filename))))))
 
 (defun chatgpt-arcana-chat-enable-autosave ()
   "Enable autosave functionality. This will save the file after every sent message."
