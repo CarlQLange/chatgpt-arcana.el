@@ -15,6 +15,7 @@
 
 (require 'url)
 (require 'json)
+(require 'cl)
 (require 'cl-lib)
 (require 'request)
 (require 'markdown-mode)
@@ -115,6 +116,22 @@ Or, just write the file if it already exists."
       (write-region (point-min) (point-max) (concat dir filename) nil 'silent)
       (find-file (concat dir filename))
       (kill-buffer orig-buffer-name))))
+
+(defun chatgpt-arcana-chat-save-given-buffer-to-autosave-file (buffer)
+  "Save the given buffer to an autosave file and open it.
+Or, just write the file if it already exists."
+  (with-current-buffer buffer
+    (if (and (buffer-file-name) (equal (symbol-name major-mode) "chatgpt-arcana-chat-mode"))
+        (write-file (buffer-file-name))
+      (let ((orig-buffer-name (buffer-name))
+            (dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
+            (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
+                              (chatgpt-arcana-generate-buffer-name-for-buffer buffer)
+                             ".chatgpt-arcana.md")))
+        (unless (file-directory-p dir) (make-directory dir t))
+        (write-region (point-min) (point-max) (concat dir filename) nil 'silent)
+        (find-file (concat dir filename))
+        (kill-buffer orig-buffer-name)))))
 
 (defun chatgpt-arcana-chat-enable-autosave ()
   "Enable autosave functionality. This will save the file after every sent message."
@@ -235,6 +252,37 @@ The JSON should be a list of messages like (:role , role :content ,content)"
                (message "Error: %S" error-thrown))))
     out))
 
+(defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback)
+  "Query the OpenAI API with formatted MESSAGES-ALIST asynchronously.
+MESSAGES-ALIST should be a list of messages (:role , role :content ,content).
+SUCCESS-CALLBACK will be called upon success with the response as its argument."
+  ; I think it's clear that I don't 100% know what I'm doing here.
+  ; But, it does work. Mission accomplished.
+  (lexical-let ((success-callback success-callback))
+    (request
+      chatgpt-arcana-api-endpoint
+      :type "POST"
+      :data (json-encode `(:model ,chatgpt-arcana-model-name
+                           :messages ,messages-alist))
+      :headers `(("Content-Type" . "application/json")
+                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
+      :parser (lambda ()
+                (let ((json-object-type 'hash-table)
+                      (json-array-type 'list)
+                      (json-key-type 'string))
+                  (json-read)))
+      :encoding 'utf-8
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (when data
+                    (let* ((success-callback success-callback)
+                           (choices (gethash "choices" data))
+                           (msg (gethash "message" (car choices)))
+                           (content (gethash "content" msg)))
+                      (funcall success-callback (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))))
+      :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                            (message "Error: %S" error-thrown))))))
+
 (defun chatgpt-arcana-generate-buffer-name (&optional prefix temp)
   "Generate a buffer name based on the first characters of the buffer.
 If PREFIX, adds the prefix in front of the name.
@@ -252,6 +300,25 @@ If TEMP, adds asterisks to the name."
               (prefix (concat prefix "-" name))
               (temp (concat "*" name "*"))
               (t name)))))
+
+(defun chatgpt-arcana-generate-buffer-name-for-buffer (buffer &optional prefix temp)
+  "Generate a buffer name based on the first characters of the given BUFFER.
+If PREFIX, adds the prefix in front of the name.
+If TEMP, adds asterisks to the name."
+  (with-current-buffer buffer
+    (save-excursion
+      (goto-char (point-min))
+      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max)))
+                     (string-trim chatgpt-arcana-chat-separator-system))
+        (search-forward (string-trim chatgpt-arcana-chat-separator-user) nil t))
+      (let ((name
+             (chatgpt-arcana--query-api-alist
+              `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
+                ((role . "user") (content . ,(buffer-substring-no-properties (point) (min (+ 1200 (point)) (point-max)))))))))
+        (cond ((and prefix temp) (concat "*" prefix name "*"))
+              (prefix (concat prefix "-" name))
+              (temp (concat "*" name "*"))
+              (t name))))))
 
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
   "Magically rename a buffer based on its contents.
@@ -455,15 +522,31 @@ If no matching files are found, the function will display an error message."
       (chatgpt-arcana-chat-start-new-chat-response)))
   (goto-char (point-max)))
 
+(defun chatgpt-arcana-chat-send-buffer-and-insert-at-end-async ()
+  "Send the current chat buffer and insert the response at the end."
+  (lexical-let ((buffer-name (buffer-name)))
+    (chatgpt-arcana--query-api-alist-async
+     (chatgpt-arcana-chat-buffer-to-alist)
+     (lambda (data)
+       (let ((inserted-text data))
+         (with-current-buffer buffer-name
+           (save-excursion
+             (goto-char (point-max))
+             (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
+               (setq inserted-text (concat chatgpt-arcana-chat-separator-assistant inserted-text)))
+             (insert inserted-text)
+             (chatgpt-arcana-chat-start-new-chat-response)
+             (when chatgpt-arcana-chat-autosave-enabled
+               (chatgpt-arcana-chat-save-given-buffer-to-autosave-file buffer-name)
+                ; since saving to autosave opens that file, we need to move the pointer again
+               (goto-char (point-max))))))))))
+
 (defun chatgpt-arcana-chat-send-message ()
   "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer."
   (interactive)
-  (chatgpt-arcana-chat-send-buffer-and-insert-at-end)
-  (when chatgpt-arcana-chat-autosave-enabled
-    (chatgpt-arcana-chat-save-to-autosave-file)
-    ; since saving to autosave opens that file, we need to move the pointer again
-    (goto-char (point-max))))
+  (chatgpt-arcana-chat-send-buffer-and-insert-at-end-async))
 
+; TODO this should probably go into my own config
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
   "Generate a list of hydra commands for each prompt in `chatgpt-arcana-common-prompts-alist`."
   (mapcar (lambda (prompt)
