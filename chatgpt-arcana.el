@@ -102,33 +102,22 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
   :type 'boolean
   :group 'chatgpt-arcana-chat)
 
-(defun chatgpt-arcana-chat-save-to-autosave-file ()
-  "Save the current buffer to an autosave file and open it.
-Or, just write the file if it already exists."
+(defun chatgpt-arcana-chat-save-to-autosave-file (&optional buffer)
+  "Save the current buffer, or the given BUFFER, to an autosave file and open it.
+Or, just write the file if it already exists.
+This function is async but doesn't take a callback."
   (if (and (buffer-file-name) (equal (symbol-name major-mode) "chatgpt-arcana-chat-mode"))
       (write-file (buffer-file-name))
-    (let ((orig-buffer-name (buffer-name))
-          (dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
-          (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
-                            (chatgpt-arcana-generate-buffer-name)
-                            ".chatgpt-arcana.md")))
-      (unless (file-directory-p dir) (make-directory dir t))
-      (write-region (point-min) (point-max) (concat dir filename) nil 'silent)
-      (find-file (concat dir filename))
-      (kill-buffer orig-buffer-name))))
-
-(defun chatgpt-arcana-chat-save-given-buffer-to-autosave-file (buffer)
-  "Save the given buffer to an autosave file and open it.
-Or, just write the file if it already exists."
-  (with-current-buffer buffer
-    (if (and (buffer-file-name) (equal (symbol-name major-mode) "chatgpt-arcana-chat-mode"))
-        (write-file (buffer-file-name))
-      (let ((dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
-            (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
-                              (chatgpt-arcana-generate-buffer-name-for-buffer buffer)
-                             ".chatgpt-arcana.md")))
-        (unless (file-directory-p dir) (make-directory dir t))
-        (write-file (concat dir filename))))))
+    (lexical-let ((buf (or buffer (current-buffer))))
+      (chatgpt-arcana-generate-buffer-name-async (or buffer (current-buffer)) 'nil 'nil
+                                                 (lambda (name)
+                                                   (with-current-buffer buf
+                                                     (let ((dir (file-name-as-directory chatgpt-arcana-chat-autosave-directory))
+                                                           (filename (concat (format-time-string "%Y-%m-%d-%H-%M-%S-")
+                                                                             name
+                                                                             ".chatgpt-arcana.md")))
+                                                       (unless (file-directory-p dir) (make-directory dir t))
+                                                       (write-file (concat dir filename)))))))))
 
 (defun chatgpt-arcana-chat-enable-autosave ()
   "Enable autosave functionality. This will save the file after every sent message."
@@ -280,29 +269,11 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
                             (message "Error: %S" error-thrown))))))
 
-(defun chatgpt-arcana-generate-buffer-name (&optional prefix temp)
-  "Generate a buffer name based on the first characters of the buffer.
-If PREFIX, adds the prefix in front of the name.
-If TEMP, adds asterisks to the name."
-  (save-excursion
-    (goto-char (point-min))
-      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max)))
-                     (string-trim chatgpt-arcana-chat-separator-system))
-        (search-forward (string-trim chatgpt-arcana-chat-separator-user) nil t))
-      (let ((name
-             (chatgpt-arcana--query-api-alist
-              `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
-                ((role . "user") (content . ,(buffer-substring-no-properties (point) (min (+ 1200 (point)) (point-max)))))))))
-        (cond ((and prefix temp) (concat "*" prefix name "*"))
-              (prefix (concat prefix "-" name))
-              (temp (concat "*" name "*"))
-              (t name)))))
-
-(defun chatgpt-arcana-generate-buffer-name-for-buffer (buffer &optional prefix temp)
+(defun chatgpt-arcana-generate-buffer-name (&optional buffer prefix temp)
   "Generate a buffer name based on the first characters of the given BUFFER.
 If PREFIX, adds the prefix in front of the name.
 If TEMP, adds asterisks to the name."
-  (with-current-buffer buffer
+  (with-current-buffer (or buffer (current-buffer))
     (save-excursion
       (goto-char (point-min))
       (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max)))
@@ -317,14 +288,50 @@ If TEMP, adds asterisks to the name."
               (temp (concat "*" name "*"))
               (t name))))))
 
+; TODO clean this up so that it just acts on the input prompt, we don't need to go any further than that.
+(defun chatgpt-arcana-generate-buffer-name-async (&optional buffer prefix temp callback)
+  "Generate a buffer name for BUFFER based on the input prompt.
+If BUFFER, use that buffer; otherwise, current buffer.
+If PREFIX, adds the prefix in front of the name.
+If TEMP, adds asterisks to the name.
+CALLBACK called with the buffer name as response."
+  (lexical-let* ((callback callback)
+                 (prefix prefix)
+                 (temp temp)
+                 (buf (or buffer (current-buffer)))
+                 (input
+                  (with-current-buffer buf
+                    (alist-get 'content (car (cdr (chatgpt-arcana-chat-buffer-to-alist)))))))
+    (chatgpt-arcana--query-api-alist-async
+     `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
+       ((role . "user") (content . ,input)))
+     (lambda (data)
+       (let ((name data))
+         (with-current-buffer buf
+           (cond ((and prefix temp) (setq name (concat "*" prefix name "*")))
+                 (prefix (setq name (concat prefix "-" name)))
+                 (temp (setq name (concat "*" name "*")))))
+         (funcall callback name))))))
+
+
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
-  "Magically rename a buffer based on its contents.
+  "Magically rename a chat buffer based on its contents.
 Only when the buffer isn't visiting a file."
   (interactive)
   (when (not buffer-file-name)
     (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
       (unless (get-buffer new-name)
         (rename-buffer new-name)))))
+
+(defun chatgpt-arcana-chat-rename-buffer-automatically-async ()
+  "Magically rename a buffer based on its contents.
+Only when the buffer isn't visiting a file."
+  (interactive)
+  (when (not buffer-file-name)
+    (chatgpt-arcana-generate-buffer-name-async (current-buffer) "chatgpt-arcana-chat:" t
+                                               (lambda (new-name)
+                                                 (unless (get-buffer new-name)
+                                                   (rename-buffer new-name))))))
 
 (defun chatgpt-arcana-chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
@@ -342,11 +349,11 @@ Only when the buffer isn't visiting a file."
           (push `((role . ,role) (content . ,(string-trim content))) messages))))
     (reverse messages)))
 
-(defun chatgpt-arcana-chat-buffer-to-alist ()
-  "Transforms the current buffer into a JSON array of chat messages."
-  (interactive)
-  (let ((chat-string (buffer-string)))
-    (chatgpt-arcana-chat-string-to-alist chat-string)))
+(defun chatgpt-arcana-chat-buffer-to-alist (&optional buffer)
+  "Transforms the specified BUFFER or the current buffer into an alist of chat messages."
+  (with-current-buffer (or buffer (current-buffer))
+    (let ((chat-string (buffer-string)))
+      (chatgpt-arcana-chat-string-to-alist chat-string))))
 
 ;;#TODO refactor the below functions:
 ;; - chatgpt-arcana-query
@@ -534,12 +541,13 @@ If no matching files are found, the function will display an error message."
              (insert inserted-text)
              (chatgpt-arcana-chat-start-new-chat-response)
              (when chatgpt-arcana-chat-autosave-enabled
-               (chatgpt-arcana-chat-save-given-buffer-to-autosave-file buffer-name)
+               (chatgpt-arcana-chat-save-to-autosave-file buffer-name)
                 ; since saving to autosave opens that file, we need to move the pointer again
                (goto-char (point-max))))))))))
 
 (defun chatgpt-arcana-chat-send-message ()
-  "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer."
+  "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer.
+This function is async, but doesn't take a callback."
   (interactive)
   (chatgpt-arcana-chat-send-buffer-and-insert-at-end-async))
 
