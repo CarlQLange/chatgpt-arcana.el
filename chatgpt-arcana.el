@@ -269,26 +269,6 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
                             (message "Error: %S" error-thrown))))))
 
-(defun chatgpt-arcana-generate-buffer-name (&optional buffer prefix temp)
-  "Generate a buffer name based on the first characters of the given BUFFER.
-If PREFIX, adds the prefix in front of the name.
-If TEMP, adds asterisks to the name."
-  (with-current-buffer (or buffer (current-buffer))
-    (save-excursion
-      (goto-char (point-min))
-      (when (string= (buffer-substring-no-properties (point-min) (min 16 (point-max)))
-                     (string-trim chatgpt-arcana-chat-separator-system))
-        (search-forward (string-trim chatgpt-arcana-chat-separator-user) nil t))
-      (let ((name
-             (chatgpt-arcana--query-api-alist
-              `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
-                ((role . "user") (content . ,(buffer-substring-no-properties (point) (min (+ 1200 (point)) (point-max)))))))))
-        (cond ((and prefix temp) (concat "*" prefix name "*"))
-              (prefix (concat prefix "-" name))
-              (temp (concat "*" name "*"))
-              (t name))))))
-
-; TODO clean this up so that it just acts on the input prompt, we don't need to go any further than that.
 (defun chatgpt-arcana-generate-buffer-name-async (&optional buffer prefix temp callback)
   "Generate a buffer name for BUFFER based on the input prompt.
 If BUFFER, use that buffer; otherwise, current buffer.
@@ -313,19 +293,10 @@ CALLBACK called with the buffer name as response."
                  (temp (setq name (concat "*" name "*")))))
          (funcall callback name))))))
 
-
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
-  "Magically rename a chat buffer based on its contents.
-Only when the buffer isn't visiting a file."
-  (interactive)
-  (when (not buffer-file-name)
-    (let ((new-name (chatgpt-arcana-generate-buffer-name "chatgpt-arcana-chat:" 't)))
-      (unless (get-buffer new-name)
-        (rename-buffer new-name)))))
-
-(defun chatgpt-arcana-chat-rename-buffer-automatically-async ()
   "Magically rename a buffer based on its contents.
-Only when the buffer isn't visiting a file."
+Only when the buffer isn't visiting a file.
+This function is async but doesn't take a callback."
   (interactive)
   (when (not buffer-file-name)
     (chatgpt-arcana-generate-buffer-name-async (current-buffer) "chatgpt-arcana-chat:" t
@@ -516,18 +487,8 @@ If no matching files are found, the function will display an error message."
       (goto-char (point-max)))))
 
 (defun chatgpt-arcana-chat-send-buffer-and-insert-at-end ()
-  "Send the current chat buffer and insert the response at the end."
-  (save-excursion
-    (let* ((inserted-text (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-buffer-to-alist))))
-      (goto-char (point-max))
-      (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
-        (setq inserted-text (concat chatgpt-arcana-chat-separator-assistant inserted-text)))
-      (insert inserted-text)
-      (chatgpt-arcana-chat-start-new-chat-response)))
-  (goto-char (point-max)))
-
-(defun chatgpt-arcana-chat-send-buffer-and-insert-at-end-async ()
-  "Send the current chat buffer and insert the response at the end."
+  "Send the current chat buffer and insert the response at the end.
+This function is async, but doesn't take a callback."
   (lexical-let ((buffer-name (buffer-name)))
     (chatgpt-arcana--query-api-alist-async
      (chatgpt-arcana-chat-buffer-to-alist)
@@ -549,7 +510,7 @@ If no matching files are found, the function will display an error message."
   "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer.
 This function is async, but doesn't take a callback."
   (interactive)
-  (chatgpt-arcana-chat-send-buffer-and-insert-at-end-async))
+  (chatgpt-arcana-chat-send-buffer-and-insert-at-end))
 
 ; TODO this should probably go into my own config
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
