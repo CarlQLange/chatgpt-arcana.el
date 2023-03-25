@@ -136,7 +136,7 @@ This function is async but doesn't take a callback."
       (chatgpt-arcana-chat-disable-autosave)
     (chatgpt-arcana-chat-enable-autosave)))
 
-(define-derived-mode chatgpt-arcana-chat-mode markdown-mode "ChatGPT Arcana Chat"
+(define-derived-mode chatgpt-arcana-chat-mode gfm-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
   (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-message)
   (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
