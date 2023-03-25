@@ -23,7 +23,7 @@
 
 (defaction
  capitalise
- #'(lambda (codestr) (upcase codestr))
+ #'(lambda (s) (upcase s))
  "eg: capitalise { str } => STR")
 
 (defaction
