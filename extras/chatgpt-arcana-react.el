@@ -21,15 +21,39 @@
                       (format "Action Name: %s\nAction Description: %s\n\n" name (documentation fn-symbol))))))
     result))
 
+(defun search-actions (search-str)
+  "Return a list of actions containing `search-str` in the name or docstring."
+  (let ((result '()))
+    (dolist (action actions-alist)
+      (let* ((name (car action))
+             (fn-symbol (intern (concat "chatgpt-arcana-react--action-" (car action))))
+             (docstring (documentation fn-symbol)))
+        (when (or
+               (string-match-p (regexp-quote search-str) name)
+               (string-match-p (regexp-quote search-str) docstring))
+          (push (cons name docstring) result))))
+    (if (= (length result) 0)
+        (format "No actions found matching \"%s\"" search-str)
+      result)))
+
 (defaction
- capitalise
- #'(lambda (s) (upcase s))
- "eg: capitalise { str } => STR")
+ search-actions
+ #'(lambda (s) (search-actions s))
+ "Search the actions you can take.
+Will look in the name and documentation of the actions.")
 
 (defaction
  list-actions
  #'(lambda () (list-actions))
  "Lists all actions you can take, with their documentation and examples.")
+
+(defaction
+ get-user-input
+ #'(lambda (prompt) (read-string prompt))
+ "Get user input in response to `prompt`.
+  Returns the user's response as a string.
+  Example: get-user-input { What is your name? }"
+ )
 
 (defaction
  eval
@@ -60,12 +84,13 @@
 
 (setq react-initial-prompt (format "
 You run in a loop of Thought, Action, PAUSE, Observation.
-At the end of the loop you output an Answer
+At the end of the loop you output an Answer.
 Use Thought to describe your thoughts about the question you have been asked. You should always use Thought in a message, especially to reason about the expected outcome of an Action.
+You should always question whether the last Observation answers your task.
 Use Action to run one of the actions available to you - then return PAUSE. Only one Action per message is permitted.
-You may NOT UNDER ANY CIRCUMSTANCES write anything after the keyword PAUSE.
 PAUSE indicates you are waiting for an Observation from an Action. You must wait for an Observation after PAUSE.
-Observation will be the result of running those actions.
+YOU MAY NOT NOT UNDER ANY CIRCUMSTANCES WRITE ANYTHING AFTER PAUSE UNTIL CALLED AGAIN.
+Observation will be the result of running those actions. Do NOT predict the response. Do NOT write Observations yourself.
 If you began your message with the string Answer, the loop is ended.
 You may only Answer after at least one Observation-PAUSE cycle.
 
@@ -83,27 +108,38 @@ here.
 Do NOT use triple backticks to wrap multiline arguments.
 The opening parenthesis MUST be on the same line as the action name or it will fail.
 
-The following is a list of some of the actions.
-You should list the actions to verify an action exists before calling one that does not exist in this list.
+The following is a list of some of the actions you can use.
+You should use the action search-actions to discover actions.
+You should verify an action exists before using one that does not exist in this list.
 
 Action List:
 %s
 End action list.
 
-Example session:
+Example session. User input is marked with >.
+> What is the capital of France?
 
-Question: What is the capital of France?
-Thought: I should look up France on Wikipedia.
-Action: eval: { (with-current-buffer (url-retrieve-synchronously \"https://en.wikipedia.org/wiki/France\") (buffer-string))) }
+Thought: I should look up France on Wikipedia. Perhaps an action exists to do so.
+Action: search-actions { wikipedia }
 PAUSE
 
-You will be called again with this:
 
-Observation: France is a country. The capital is Paris.
+> Observation: No actions found matching wikipedia.
 
-You then output:
+
+Thought: I will have to write some Emacs lisp to look this up on Wikipedia.
+Action: eval { (with-current-buffer (url-retrieve-synchronously \"https://en.wikipedia.org/wiki/France\") (buffer-string))) }
+PAUSE
+
+
+> Observation: <The wikipedia page string>
+
+
+Thought: I have read this page and found the answer.
 Answer: The capital of France is Paris.
 End example session.
+
+From this point on, you must act in this loop according to the rules.
 " (list-actions)))
 
 (defconst initial-conversation-log-alist
@@ -136,7 +172,7 @@ End example session.
     (with-current-buffer chat-buffer
       (buffer-string))))
 
-(defvar action-regex "^Action: \\([^[:space:]]+\\)\\(\s+{\\([^}]*\\)}\\)?")
+(defvar action-regex "^Action: \\([^[:space:]]+\\)\\( +{\\([^}]*\\)}\\)?")
 (defvar answer-regex "^Answer: \\(.+\\)$")
 (defvar thought-regex "^Thought: \\(.+\\)$")
 (defvar observation-regex "^Observation: \\(.+\\)$")
@@ -144,7 +180,7 @@ End example session.
 (defun query-loop (question max-turns)
   (let ((clog initial-conversation-log-alist)
         (query-i 0)
-        (next-prompt question)
+        (next-prompt (format "Task: %s" question))
         (query-ongoing t))
     (while (and
             query-ongoing
@@ -172,4 +208,4 @@ End example session.
           )))
     (conversation-alist-to-chat-buffer clog)))
 
-(query-loop "Close other windows, split the window, and open the *chatgpt-arcana-react* buffer in the split." 5)
+(query-loop "Reverse the user's name" 5)
