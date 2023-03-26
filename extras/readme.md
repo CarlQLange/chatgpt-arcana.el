@@ -4,16 +4,13 @@ These are some extras that are not part of the main package and I disavow any kn
 
 ## ChatGPT Arcana ReAct
 
-This is a work in progress inplementation of the ReAct framework, courtesy LangChain and Simon Willison's blog (references to come).
+This is a work in progress inplementation of the [ReAct framework](https://react-lm.github.io/), courtesy [LangChain](https://github.com/hwchase17/langchain) and [Simon Willison's blog](https://til.simonwillison.net/llms/python-react-pattern).
 It defines a macro, `defaction`, which allows ChatGPT to run code. This is a deeply powerful and dangerous magic and may genuinely result in the destruction of all you hold dear (eg, `rm -rf /`). **BE EXTREMELY CAREFUL** with what you do and ask of ChatGPT in this mode because it is, **by default**, able to just `eval` arbitrary elisp.
 
 Define your actions with code like the following:
 
 ```elisp
-(defaction
- capitalise
- #'(lambda (s) (upcase s))
- "eg: capitalise { str } => STR")
+(defaction capitalise #'(lambda (s) (upcase s)) "eg: capitalise { str } => STR")
 ```
 
 The first argument is the action name, second the function to be run, and third the docstring, which will be passed to ChatGPT (if it asks for it).
