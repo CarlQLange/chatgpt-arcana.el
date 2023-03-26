@@ -52,8 +52,7 @@ Will look in the name and documentation of the actions.")
  #'(lambda (prompt) (read-string prompt))
  "Get user input in response to `prompt`.
   Returns the user's response as a string.
-  Example: get-user-input { What is your name? }"
- )
+  Example: get-user-input { What is your name? }")
 
 (defaction
  eval
