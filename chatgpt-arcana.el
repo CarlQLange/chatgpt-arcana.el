@@ -212,7 +212,8 @@ If CONCAT-MODE-TO-PROMPT is set, will add the current major mode to the system p
 
 (defun chatgpt-arcana--query-api-alist (messages-alist)
   "Query the OpenAI API with formatted MESSAGES-ALIST.
-The JSON should be a list of messages like (:role , role :content ,content)"
+The JSON should be a list of messages like (:role , role :content ,content)
+Returns the resulting message only."
   (let ((out))
     (request
       chatgpt-arcana-api-endpoint
