@@ -20,10 +20,6 @@ Call it with `query-loop` (good name TBD). None of the definitions in this file 
 Here's an example of a query loop in action.
 
 ```
-------- system:
-
-<system prompt elided for brevity>
-
 ------- user:
 
 Close other windows, split the window, and open the *chatgpt-arcana-react* buffer in the split.
@@ -51,4 +47,36 @@ Observation: #<buffer *chatgpt-arcana-react*>
 ------- assistant:
 
 Answer: The *chatgpt-arcana-react* buffer has been successfully opened in a split window.
+```
+
+And another example:
+
+```
+------- user:
+
+Task: Reverse the user's name
+
+------- assistant:
+
+Thought: I need to get the user's name and then reverse it.
+Action: get-user-input { Please enter your name: }
+PAUSE
+
+------- user:
+
+Observation: Carl Lange
+
+------- assistant:
+
+Thought: I will use Emacs lisp to reverse the string.
+Action: eval { (apply 'string (reverse (string-to-list "Carl Lange"))) }
+PAUSE
+
+------- user:
+
+Observation: "egnaL lraC"
+
+------- assistant:
+
+Answer: The reverse of "Carl Lange" is "egnaL lraC".
 ```

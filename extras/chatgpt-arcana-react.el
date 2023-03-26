@@ -160,12 +160,14 @@ From this point on, you must act in this loop according to the rules.
      `((role . "assistant")
        (content . ,out)))))
 
-(defun conversation-alist-to-chat-buffer (chat-alist)
+(defun conversation-alist-to-chat-buffer (chat-alist &optional skip-system)
   "Transforms CHAT-ALIST into a chat buffer."
   (let ((chat-buffer (get-buffer-create "*chatgpt-arcana-react*")))
     (with-current-buffer chat-buffer
+      (unless (bound-and-true-p chatgpt-arcana-reacty-mode)
+        (chatgpt-arcana-reacty-mode))
       (erase-buffer)
-      (dolist (message chat-alist)
+      (dolist (message (if skip-system (cdr chat-alist) chat-alist))
         (let ((role (cdr (assoc 'role message)))
               (content (cdr (assoc 'content message))))
           (insert (format "------- %s:\n\n%s\n\n" role content)))))
@@ -177,6 +179,19 @@ From this point on, you must act in this loop according to the rules.
 (defvar thought-regex "^Thought: \\(.+\\)$")
 (defvar observation-regex "^Observation: \\(.+\\)$")
 
+(define-derived-mode chatgpt-arcana-react-mode gfm-mode "ChatGPT Arcana ReAct")
+
+(font-lock-add-keywords
+  'chatgpt-arcana-react-mode
+  `(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
+    ("^--[-]+" . font-lock-comment-face)
+    (,thought-regex 1 font-lock-keyword-face)
+    (,answer-regex 1 font-lock-keyword-face)
+    (,observation-regex 1 font-lock-keyword-face)
+    (,action-regex 1 font-lock-constant-face)
+    (,action-regex 3 font-lock-string-face)
+    ))
+
 (defun query-loop (question max-turns)
   (let ((clog initial-conversation-log-alist)
         (query-i 0)
@@ -187,7 +202,7 @@ From this point on, you must act in this loop according to the rules.
             (< query-i max-turns)
             )
       (message "QUERYING %S" query-i)
-      (conversation-alist-to-chat-buffer clog)
+      (conversation-alist-to-chat-buffer clog t)
       (sit-for 0.2)
       (setq query-i (+ query-i 1))
       (let* ((result-clog (query-and-add-to-log
@@ -206,6 +221,6 @@ From this point on, you must act in this loop according to the rules.
             (message "QUERY DONE!")
             (setq query-ongoing 'nil))
           )))
-    (conversation-alist-to-chat-buffer clog)))
+    (conversation-alist-to-chat-buffer clog t)))
 
-(query-loop "Reverse the user's name" 5)
+;(query-loop "Reverse the user's name" 5)
