@@ -1,14 +1,22 @@
-;; -*- lexical-binding: t -*-
 (require 'chatgpt-arcana)
 
 (defvar actions-alist '())
+
+(defgroup chatgpt-arcana-react nil
+  "An implementation of the ReAct chatbot framework in Emacs."
+  :group 'tools)
+
+(defcustom chatgpt-arcana-react-actions-directory (concat user-emacs-directory "chatgpt-arcana/react-actions")
+  "Directory containing action files"
+  :type 'directory
+  :group 'chatgpt-arcana-react)
 
 (defmacro defaction (name fn docstring)
   `(progn
      (add-to-list 'actions-alist (cons ,(symbol-name name) ,fn))
      (defun ,(intern (concat "chatgpt-arcana-react--action-" (symbol-name name))) (args)
        ,docstring
-       (apply ',fn args))))
+       (apply ,fn args))))
 
 (defun list-actions ()
   "List all available actions and their docstrings."
@@ -20,6 +28,37 @@
               (concat result
                       (format "Action Name: %s\nAction Description: %s\n\n" name (documentation fn-symbol))))))
     result))
+
+(defun save-actions ()
+  "Saves all defined actions to files in the actions directory"
+  (unless (file-directory-p chatgpt-arcana-react-actions-directory)
+    (make-directory chatgpt-arcana-react-actions-directory t))
+  (dolist (action actions-alist)
+    (let* ((name (car action))
+           (fn-symbol (intern (concat "chatgpt-arcana-react--action-" (car action))))
+           (docstring (documentation fn-symbol))
+           (file (concat chatgpt-arcana-react-actions-directory "/" name ".el"))
+           (code (concat "(defaction "
+                         name
+                         " "
+                         (prin1-to-string (cadar (last (symbol-function fn-symbol))))
+                         " \"" docstring "\")")))
+      (with-temp-file file
+        (insert code))))
+  (message "Actions saved to %s" chatgpt-arcana-react-actions-directory))
+
+(defun load-actions ()
+  "Loads all actions in the actions directory"
+  (let* ((actions-dir chatgpt-arcana-react-actions-directory)
+         (files (directory-files-recursively actions-dir ".*\\.el$")))
+    (dolist (file files)
+      (load file))))
+
+(defun refresh-actions ()
+  "Refreshes the list of available actions."
+  (interactive)
+  (setq actions-alist '())
+  (load-actions))
 
 (defun search-actions (search-str)
   "Return a list of actions containing `search-str` in the name or docstring."
@@ -55,6 +94,33 @@ Will look in the name and documentation of the actions.")
   Example: get-user-input { What is your name? }")
 
 (defaction
+ create-action
+ #'(lambda (args)
+     (let* ((parsed-args (eval (car (read-from-string (concat "'(" args ")")))))
+            (name (plist-get parsed-args :name))
+            (impl (plist-get parsed-args :impl))
+            (docstring (plist-get parsed-args :doc)))
+       (eval `(defaction ,name #',impl ,docstring))
+       (save-actions)))
+ "Create a new custom action. Expects a single argument in the format:
+:name <symbol>
+:impl <function object>
+:doc <documentation string>
+  where <symbol> is the name that will be used to reference the new action,
+  <function object> is a lambda function that defines the action's behavior,
+  and <documentation string> is a string explaining the action's purpose and behavior.
+Example:
+Action: create-action {
+:name foo
+:impl (lambda (args)
+(message args)
+)
+:doc \"This function is an example function.
+It simply logs out the given argument.\"
+}
+")
+
+(defaction
  eval
  #'(lambda (codestr)
      (format "%S" (condition-case err
@@ -74,12 +140,13 @@ Will look in the name and documentation of the actions.")
   otherwise only the first sexp will be executed.
   Always use a built-in action instead of eval-ing code if you can.")
 
-(defun dispatch-action (name args)
-  (message "CALLING %s WITH ARGS %s" name args)
-  (let ((action (cdr (assoc name actions-alist))))
-    (if action
-        (funcall action args)
-      (format "Action not found: %s" name))))
+(defun dispatch-action (name &optional args)
+  (if (assoc name actions-alist)
+      (let ((action (cdr (assoc name actions-alist))))
+        (if args
+            (funcall action args)
+          (funcall action)))
+    (format "Action not found: %s" name)))
 
 (setq react-initial-prompt (format "
 You run in a loop of Thought, Action, PAUSE, Observation.
