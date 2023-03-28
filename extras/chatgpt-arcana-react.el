@@ -18,6 +18,20 @@
        ,docstring
        (apply ,fn args))))
 
+(defun load-actions ()
+  "Loads all actions in the actions directory"
+  (let* ((actions-dir chatgpt-arcana-react-actions-directory)
+         (files (directory-files-recursively actions-dir ".*\\.el$")))
+    (dolist (file files)
+      (load file))))
+
+(defun refresh-actions ()
+  "Refreshes the list of available actions."
+  (interactive)
+  (setq actions-alist '())
+  (load-actions))
+(refresh-actions)
+
 (defun list-actions ()
   "List all available actions and their docstrings."
   (let ((result ""))
@@ -42,23 +56,10 @@
                          name
                          " "
                          (prin1-to-string (cadar (last (symbol-function fn-symbol))))
-                         " \"" docstring "\")")))
+                         (format " %S) " docstring))))
       (with-temp-file file
         (insert code))))
   (message "Actions saved to %s" chatgpt-arcana-react-actions-directory))
-
-(defun load-actions ()
-  "Loads all actions in the actions directory"
-  (let* ((actions-dir chatgpt-arcana-react-actions-directory)
-         (files (directory-files-recursively actions-dir ".*\\.el$")))
-    (dolist (file files)
-      (load file))))
-
-(defun refresh-actions ()
-  "Refreshes the list of available actions."
-  (interactive)
-  (setq actions-alist '())
-  (load-actions))
 
 (defun search-actions (search-str)
   "Return a list of actions containing `search-str` in the name or docstring."
@@ -75,40 +76,55 @@
         (format "No actions found matching \"%s\"" search-str)
       result)))
 
-(defaction
- search-actions
- #'(lambda (s) (search-actions s))
- "Search the actions you can take.
-Will look in the name and documentation of the actions.")
+(defun action-defined-p (action-name)
+  "Returns nil if the action is not in the actions-alist, and t otherwise"
+  (assoc action-name actions-alist))
 
-(defaction
- list-actions
- #'(lambda () (list-actions))
- "Lists all actions you can take, with their documentation and examples.")
+(unless (action-defined-p "search-actions")
+  (defaction
+   search-actions
+   #'(lambda (s) (search-actions (string-trim s)))
+   "Search the actions you can take.
+Will look in the name and documentation of the actions."))
 
-(defaction
- get-user-input
- #'(lambda (prompt) (read-string prompt))
- "Get user input in response to `prompt`.
+(unless (action-defined-p "list-actions")
+  (defaction
+   list-actions
+   #'(lambda () (list-actions))
+   "Lists all actions you can take, with their documentation and examples."))
+
+(unless (action-defined-p "refresh-actions")
+  (defaction
+   refresh-actions
+   #'(lambda () (refresh-actions))
+   "Refreshes the list of actions."))
+
+(unless (action-defined-p "get-user-input")
+  (defaction
+   get-user-input
+   #'(lambda (prompt) (read-string prompt))
+   "Get user input in response to `prompt`.
   Returns the user's response as a string.
-  Example: get-user-input { What is your name? }")
+  Example: get-user-input { What is your name? }"))
 
-(defaction
- create-action
- #'(lambda (args)
-     (let* ((parsed-args (eval (car (read-from-string (concat "'(" args ")")))))
-            (name (plist-get parsed-args :name))
-            (impl (plist-get parsed-args :impl))
-            (docstring (plist-get parsed-args :doc)))
-       (eval `(defaction ,name #',impl ,docstring))
-       (save-actions)))
- "Create a new custom action. Expects a single argument in the format:
+(unless (action-defined-p "create-action")
+  (defaction
+   create-action
+   #'(lambda (args)
+       (let* ((parsed-args (eval (car (read-from-string (concat "'(" args ")")))))
+              (name (plist-get parsed-args :name))
+              (impl (plist-get parsed-args :impl))
+              (docstring (plist-get parsed-args :doc)))
+         (eval `(defaction ,name #',impl ,docstring))
+         (save-actions)))
+   "Create a new custom action. Expects a single argument in the format:
 :name <symbol>
 :impl <function object>
 :doc <documentation string>
   where <symbol> is the name that will be used to reference the new action,
   <function object> is a lambda function that defines the action's behavior,
   and <documentation string> is a string explaining the action's purpose and behavior.
+Before using this, make sure the impl function works correctly using the eval action.
 Example:
 Action: create-action {
 :name foo
@@ -118,16 +134,17 @@ Action: create-action {
 :doc \"This function is an example function.
 It simply logs out the given argument.\"
 }
-")
+"))
 
-(defaction
- eval
- #'(lambda (codestr)
-     (format "%S" (condition-case err
-                      (eval (car (read-from-string codestr)))
-                    (error
-                     (error-message-string err)))))
- "e.g. eval { (+ 2 2) }
+(unless (action-defined-p "eval")
+  (defaction
+   eval
+   #'(lambda (codestr)
+       (format "%S" (condition-case err
+                        (eval (car (read-from-string codestr)))
+                      (error
+                       (error-message-string err)))))
+   "e.g. eval { (+ 2 2) }
   e.g. eval {
   (+
   2
@@ -138,7 +155,7 @@ It simply logs out the given argument.\"
   eval-ing new code.
   You should always wrap multiple sexps in a progn,
   otherwise only the first sexp will be executed.
-  Always use a built-in action instead of eval-ing code if you can.")
+  Always use a built-in action instead of eval-ing code if you can."))
 
 (defun dispatch-action (name &optional args)
   (if (assoc name actions-alist)
@@ -178,38 +195,26 @@ The following is a list of some of the actions you can use.
 You should use the action search-actions to discover actions.
 You should verify an action exists before using one that does not exist in this list.
 
-Action List:
+Some actions:
 %s
-End action list.
 
-Example session. User input is marked with >.
-> What is the capital of France?
-
-Thought: I should look up France on Wikipedia. Perhaps an action exists to do so.
-Action: search-actions { wikipedia }
-PAUSE
-
-
-> Observation: No actions found matching wikipedia.
-
-
-Thought: I will have to write some Emacs lisp to look this up on Wikipedia.
-Action: eval { (with-current-buffer (url-retrieve-synchronously \"https://en.wikipedia.org/wiki/France\") (buffer-string))) }
-PAUSE
-
-
-> Observation: <The wikipedia page string>
-
-
-Thought: I have read this page and found the answer.
-Answer: The capital of France is Paris.
-End example session.
-
-From this point on, you must act in this loop according to the rules.
+From this point on, you MUST act in this loop according to the rules. You are a computer program and not an assistant.
 " (list-actions)))
 
 (defconst initial-conversation-log-alist
-  `(((role . "system") (content . ,react-initial-prompt))))
+  `(((role . "system") (content . ,react-initial-prompt))
+    ((role . "system") (name . "example_user") (content . "Task: What is the capital of France?"))
+    ((role . "system") (name . "example_assistant") (content . "Thought: I should look up France on Wikipedia. Perhaps an action exists to do so.
+Action: search-actions { wikipedia }
+PAUSE"))
+    ((role . "system") (name . "example_user") (content . "Observation: No actions found matching wikipedia."))
+    ((role . "system") (name . "example_assistant") (content . "Thought: I will have to run some Emacs lisp to look this up on Wikipedia.
+Action: eval { (with-current-buffer (url-retrieve-synchronously \"https://en.wikipedia.org/wiki/France\") (buffer-string))) }
+PAUSE"))
+    ((role . "system") (name . "example_user") (content . "Observation: <the wikipedia page string>"))
+    ((role . "system") (name . "example_assistant") (content . "Thought: I have read the page and found the answer.
+Answer: The capital of France is Paris."))
+    ))
 
 (defun append-to-list (clog pair)
   "Returns clog with pair appended"
@@ -230,8 +235,8 @@ From this point on, you must act in this loop according to the rules.
   "Transforms CHAT-ALIST into a chat buffer."
   (let ((chat-buffer (get-buffer-create "*chatgpt-arcana-react*")))
     (with-current-buffer chat-buffer
-      (unless (bound-and-true-p chatgpt-arcana-reacty-mode)
-        (chatgpt-arcana-reacty-mode))
+      (unless (bound-and-true-p chatgpt-arcana-react-mode)
+        (chatgpt-arcana-react-mode))
       (erase-buffer)
       (dolist (message (if skip-system (cdr chat-alist) chat-alist))
         (let ((role (cdr (assoc 'role message)))
@@ -248,15 +253,14 @@ From this point on, you must act in this loop according to the rules.
 (define-derived-mode chatgpt-arcana-react-mode gfm-mode "ChatGPT Arcana ReAct")
 
 (font-lock-add-keywords
-  'chatgpt-arcana-react-mode
-  `(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
-    ("^--[-]+" . font-lock-comment-face)
-    (,thought-regex 1 font-lock-keyword-face)
-    (,answer-regex 1 font-lock-keyword-face)
-    (,observation-regex 1 font-lock-keyword-face)
-    (,action-regex 1 font-lock-constant-face)
-    (,action-regex 3 font-lock-string-face)
-    ))
+ 'chatgpt-arcana-react-mode
+ `(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
+   ("^--[-]+" . font-lock-comment-face)
+   (,thought-regex 1 font-lock-keyword-face)
+   (,answer-regex 1 font-lock-keyword-face)
+   (,observation-regex 1 font-lock-keyword-face)
+   (,action-regex 1 font-lock-constant-face)
+   (,action-regex 3 font-lock-string-face)))
 
 (defun query-loop (question max-turns)
   (let ((clog initial-conversation-log-alist)
@@ -269,7 +273,7 @@ From this point on, you must act in this loop according to the rules.
             )
       (message "QUERYING %S" query-i)
       (conversation-alist-to-chat-buffer clog t)
-      (sit-for 0.2)
+      (sit-for 0.5)
       (setq query-i (+ query-i 1))
       (let* ((result-clog (query-and-add-to-log
                            clog
@@ -289,4 +293,6 @@ From this point on, you must act in this loop according to the rules.
           )))
     (conversation-alist-to-chat-buffer clog t)))
 
-;(query-loop "Reverse the user's name" 5)
+;;(query-loop "Reverse the user's name" 5)
+;;(query-loop "Create an action that will execute arbitrary python code and return the result of the python code. Test the action's lambda before you create it with the eval and some arbitrary python." 6)
+;;(dispatch-action "count-tokens-in-string" '(react-initial-prompt))
