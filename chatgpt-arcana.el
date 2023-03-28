@@ -327,32 +327,7 @@ This function is async but doesn't take a callback."
     (let ((chat-string (buffer-string)))
       (chatgpt-arcana-chat-string-to-alist chat-string))))
 
-;;#TODO refactor the below functions:
-;; - chatgpt-arcana-query
-;; - chatgpt-arcana-replace-region
-;; - chatgpt-arcana-insert-after-region
-;; - chatgpt-arcana-insert-before-region
-;; - chatgpt-arcana-insert-at-point
-;; - chatgpt-arcana-insert-at-point-with-context
-
-;;;###autoload
-(defun chatgpt-arcana-query (prompt)
-  "Sends the selected region to the OpenAI API with PROMPT and the system prompt."
-  (interactive "sPrompt: ")
-  (let*
-      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point))))
-       (system-prompt (chatgpt-arcana-get-system-prompt)))
-    (deactivate-mark)
-    (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
-      (erase-buffer)
-      (chatgpt-arcana-chat-mode)
-      (insert
-       (let* ((fp (concat system-prompt " Respond in markdown. User input follows." "\n\n" prompt "\n" (and selected-region (concat "\n\n"selected-region)))))
-         (concat (replace-regexp-in-string "^" "> " fp nil t) chatgpt-arcana-chat-separator-assistant "" (chatgpt-arcana--query-api fp))))
-      (unless (get-buffer-window "*chatgpt-arcana-response*")
-        (if chatgpt-arcana-chat-split-window
-            (split-window-horizontally))
-        (switch-to-buffer "*chatgpt-arcana-response*")))))
+(fset 'chatgpt-arcana-query 'chatgpt-arcana-start-chat)
 
 ;;;###autoload
 (defun chatgpt-arcana-replace-region (prompt)
@@ -360,7 +335,10 @@ This function is async but doesn't take a callback."
   (interactive "sPrompt: ")
   (let ((selected-region (buffer-substring-no-properties (mark) (point))))
     (deactivate-mark)
-    (let ((modified-region (chatgpt-arcana--query-api (concat (chatgpt-arcana-get-system-prompt) "\n" prompt " " selected-region))))
+    (let* ((input (format "%s\n%s" prompt selected-region))
+           (modified-region (chatgpt-arcana--query-api-alist
+                             `(((role . "system") (content . ,(chatgpt-arcana-get-system-prompt-for-mode-name major-mode t)))
+                               ((role . "user") (content . ,input))))))
       (delete-region (mark) (point))
       (insert modified-region))))
 
@@ -371,21 +349,41 @@ Send the selected region / custom PROMPT to the OpenAI API with PROMPT
 and insert the output before/after the region or at point.
 With optional argument BEFORE set to true, insert the output before the region.
 With optional argument IGNORE-REGION, don't pay attention to the selected region."
-  (let ((selected-region (if (and (region-active-p) (not ignore-region))
-                             (buffer-substring-no-properties (mark) (point))
-                           nil)))
+  (let ((selected-region (when (and (region-active-p) (not ignore-region))
+                             (buffer-substring-no-properties (mark) (point)))))
     (deactivate-mark)
     (save-excursion
-      (let* ((fp (concat (chatgpt-arcana-get-system-prompt)
-                         "\nUser input follows.\n\n"
-                         prompt
-                         (when selected-region (concat "\n" " " selected-region "\n"))))
-             (inserted-text (chatgpt-arcana--query-api fp)))
+      (let* ((input (concat prompt (when selected-region (concat "\n\n" selected-region "\n\n"))))
+             (inserted-text (chatgpt-arcana--query-api-alist
+                             `(((role . "system") (content . ,(chatgpt-arcana-get-system-prompt-for-mode-name major-mode t)))
+                               ((role . "user") (content . ,input))))))
         (when selected-region
           (if before
               (goto-char (if (< (mark) (point)) (mark) (point)))
             (goto-char (if (< (mark) (point)) (point) (mark)))))
         (insert inserted-text)))))
+
+;;;###autoload
+(defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
+  "Send NUM-LINES lines of context around point to the OpenAI API with PROMPT and insert the output at point."
+  (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
+  (let ((current-line (line-number-at-pos (point))))
+    (when (not current-line)
+      (insert (chatgpt-arcana--query-api prompt)))
+    (insert "[XXXX]")
+    (let* ((current-point (- (point) 6))
+           (num-lines (or num-lines 3))
+           (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
+           (system-prompt (concat (chatgpt-arcana-get-system-prompt-for-mode-name major-mode t) "\n"
+                                  "\nYour response will be inserted at [XXXX] in the selected region. Do not exceed the bounds of this context.\n"))
+           (user-prompt (concat prompt "\nSelected region:\n\n" context))
+           (modified-context (chatgpt-arcana--query-api-alist
+                             `(((role . "system") (content . ,system-prompt))
+                               ((role . "user") (content . ,user-prompt))))))
+      (save-excursion
+        (goto-char current-point)
+        (delete-char 6)
+        (insert modified-context)))))
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-after-region (prompt)
@@ -404,24 +402,6 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   "Send the custom PROMPT to the OpenAI API and insert the output at point."
   (interactive "sPrompt: ")
   (chatgpt-arcana-insert prompt nil t))
-
-;;;###autoload
-(defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
-  "Send NUM-LINES lines of context around point to the OpenAI API with PROMPT and insert the output at point."
-  (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
-  (let ((current-line (line-number-at-pos (point))))
-    (when (not current-line)
-      (insert (chatgpt-arcana--query-api prompt)))
-    (insert "[XXXX]")
-    (let* ((current-point (- (point) 6))
-           (num-lines (or num-lines 3))
-           (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
-           (fp (concat (chatgpt-arcana-get-system-prompt) "\n" "\nYour response will be inserted at [XXXX] in the selected region. Do not exceed the bounds of this context.\n" prompt "\nSelected region:\n\n" context))
-           (modified-context (chatgpt-arcana--query-api fp)))
-      (save-excursion
-        (goto-char current-point)
-        (delete-char 6)
-        (insert modified-context)))))
 
 ;;;###autoload
 (defun chatgpt-arcana-start-chat-with-system-prompt (system-prompt prompt)
@@ -525,7 +505,7 @@ This function is async, but doesn't take a callback."
                                 (chatgpt-arcana-query,(cdr prompt)))
                               ,label)))
               command))
-          (cdr chatgpt-arcana-common-prompts-alist)))
+          chatgpt-arcana-common-prompts-alist))
 
 (provide 'chatgpt-arcana)
 
