@@ -191,32 +191,44 @@ If CONCAT-MODE-TO-PROMPT is set, will add the current major mode to the system p
 (defun chatgpt-arcana--process-api-response (response)
   (replace-regexp-in-string "[“”‘’]" "`" (string-trim response)))
 
+(defun chatgpt-arcana--api-headers ()
+  "Return the headers to use when querying the API."
+  `(("Content-Type" . "application/json")
+    ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key))))
+
+(defun chatgpt-arcana--api-json-parser ()
+  "Return the JSON parser for API response."
+  (lambda ()
+    (let ((json-object-type 'hash-table)
+          (json-array-type 'list)
+          (json-key-type 'string))
+      (json-read))))
+
+(defun chatgpt-arcana--api-error-handler ()
+  "Handle errors thrown by API queries."
+  (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                 (message "Error: %S" error-thrown))))
+
 (defun chatgpt-arcana--query-api (prompt)
   "Send a query to the OpenAI API with PROMPT and return the first message content."
   (let ((out))
     (request
       chatgpt-arcana-api-endpoint
       :type "POST"
+      :headers (chatgpt-arcana--api-headers)
+      :parser (chatgpt-arcana--api-json-parser)
+      :encoding 'utf-8
+      :sync t
+      :error (chatgpt-arcana--api-error-handler)
       :data (json-encode `((model . ,chatgpt-arcana-model-name)
                            (messages . [((role . "user")
                                          (content . ,prompt))])))
-      :headers `(("Content-Type" . "application/json")
-                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
-      :sync t
-      :parser (lambda ()
-                (let ((json-object-type 'hash-table)
-                      (json-array-type 'list)
-                      (json-key-type 'string))
-                  (json-read)))
-      :encoding 'utf-8
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
                     (setq out
                           (chatgpt-arcana--process-api-response
                            (chatgpt-arcana--get-response-content
-                            (request-response-data response))))))
-      :error (lambda (error-thrown )
-               (message "Error: %S" error-thrown)))
+                            (request-response-data response)))))))
     out))
 
 (defun chatgpt-arcana--query-api-alist (messages-alist)
@@ -227,25 +239,19 @@ Returns the resulting message only."
     (request
       chatgpt-arcana-api-endpoint
       :type "POST"
+      :headers (chatgpt-arcana--api-headers)
+      :parser (chatgpt-arcana--api-json-parser)
+      :encoding 'utf-8
+      :sync t
+      :error (chatgpt-arcana--api-error-handler)
       :data (json-encode `(:model ,chatgpt-arcana-model-name
                            :messages ,messages-alist))
-      :headers `(("Content-Type" . "application/json")
-                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
-      :sync t
-      :parser (lambda ()
-                (let ((json-object-type 'hash-table)
-                      (json-array-type 'list)
-                      (json-key-type 'string))
-                  (json-read)))
-      :encoding 'utf-8
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
                   (setq out
                         (chatgpt-arcana--process-api-response
                          (chatgpt-arcana--get-response-content
-                          (request-response-data response))))))
-      :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-               (message "Error: %S" error-thrown))))
+                          (request-response-data response)))))))
     out))
 
 (defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback)
@@ -258,25 +264,19 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
     (request
       chatgpt-arcana-api-endpoint
       :type "POST"
+      :headers (chatgpt-arcana--api-headers)
+      :parser (chatgpt-arcana--api-json-parser)
+      :encoding 'utf-8
+      :error (chatgpt-arcana--api-error-handler)
       :data (json-encode `(:model ,chatgpt-arcana-model-name
                            :messages ,messages-alist))
-      :headers `(("Content-Type" . "application/json")
-                 ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key)))
-      :parser (lambda ()
-                (let ((json-object-type 'hash-table)
-                      (json-array-type 'list)
-                      (json-key-type 'string))
-                  (json-read)))
-      :encoding 'utf-8
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
                   (when data
                     (let* ((success-callback success-callback))
                       (funcall success-callback
                                (chatgpt-arcana--process-api-response
-                                (chatgpt-arcana--get-response-content data)))))))
-      :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                            (message "Error: %S" error-thrown))))))
+                                (chatgpt-arcana--get-response-content data))))))))))
 
 (defun chatgpt-arcana-generate-buffer-name-async (&optional buffer prefix temp callback)
   "Generate a buffer name for BUFFER based on the input prompt.
