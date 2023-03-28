@@ -182,6 +182,15 @@ If CONCAT-MODE-TO-PROMPT is set, will add the current major mode to the system p
         (concat system-prompt " Current Emacs major mode: " (symbol-name mode-name) ".")
       system-prompt)))
 
+(defun chatgpt-arcana--get-response-content (response)
+  (let* ((choices (gethash "choices" response))
+         (msg (gethash "message" (car choices)))
+         (content (gethash "content" msg)))
+    content))
+
+(defun chatgpt-arcana--process-api-response (response)
+  (replace-regexp-in-string "[“”‘’]" "`" (string-trim response)))
+
 (defun chatgpt-arcana--query-api (prompt)
   "Send a query to the OpenAI API with PROMPT and return the first message content."
   (let ((out))
@@ -202,10 +211,10 @@ If CONCAT-MODE-TO-PROMPT is set, will add the current major mode to the system p
       :encoding 'utf-8
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
-                  (let* ((choices (gethash "choices" (request-response-data response)))
-                         (msg (gethash "message" (car choices)))
-                         (content (gethash "content" msg)))
-                    (setq out (replace-regexp-in-string "[“”‘’]" "`" (string-trim content))))))
+                    (setq out
+                          (chatgpt-arcana--process-api-response
+                           (chatgpt-arcana--get-response-content
+                            (request-response-data response))))))
       :error (lambda (error-thrown )
                (message "Error: %S" error-thrown)))
     out))
@@ -231,10 +240,10 @@ Returns the resulting message only."
       :encoding 'utf-8
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
-                  (let* ((choices (gethash "choices" (request-response-data response)))
-                         (msg (gethash "message" (car choices)))
-                         (content (gethash "content" msg)))
-                    (setq out (replace-regexp-in-string "[“”‘’]" "`" (string-trim content))))))
+                  (setq out
+                        (chatgpt-arcana--process-api-response
+                         (chatgpt-arcana--get-response-content
+                          (request-response-data response))))))
       :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
                (message "Error: %S" error-thrown))))
     out))
@@ -262,11 +271,10 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
                   (when data
-                    (let* ((success-callback success-callback)
-                           (choices (gethash "choices" data))
-                           (msg (gethash "message" (car choices)))
-                           (content (gethash "content" msg)))
-                      (funcall success-callback (replace-regexp-in-string "[“”‘’]" "`" (string-trim content)))))))
+                    (let* ((success-callback success-callback))
+                      (funcall success-callback
+                               (chatgpt-arcana--process-api-response
+                                (chatgpt-arcana--get-response-content data)))))))
       :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
                             (message "Error: %S" error-thrown))))))
 
@@ -365,7 +373,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
-  "Send NUM-LINES lines of context around point to the OpenAI API with PROMPT and insert the output at point."
+  "Send NUM-LINES lines of context around point to ChatGPT with PROMPT and insert the output at point."
   (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
   (let ((current-line (line-number-at-pos (point))))
     (when (not current-line)
