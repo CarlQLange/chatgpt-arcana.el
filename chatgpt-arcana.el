@@ -290,7 +290,7 @@ CALLBACK called with the buffer name as response."
                  (buf (or buffer (current-buffer)))
                  (input
                   (with-current-buffer buf
-                    (alist-get 'content (car (cdr (chatgpt-arcana-chat-buffer-to-alist)))))))
+                    (alist-get 'content (car (cdr (chatgpt-arcana--chat-buffer-to-alist)))))))
     (chatgpt-arcana--query-api-alist-async
      `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
        ((role . "user") (content . ,input)))
@@ -313,7 +313,7 @@ This function is async but doesn't take a callback."
                                                  (unless (get-buffer new-name)
                                                    (rename-buffer new-name))))))
 
-(defun chatgpt-arcana-chat-string-to-alist (chat-string)
+(defun chatgpt-arcana--chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
   (let ((messages '())
         (regex "^-+\s*\\(.*\\):\s*$"))
@@ -329,16 +329,18 @@ This function is async but doesn't take a callback."
           (push `((role . ,role) (content . ,(string-trim content))) messages))))
     (reverse messages)))
 
-(defun chatgpt-arcana-chat-buffer-to-alist (&optional buffer)
+(defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
   "Transforms the specified BUFFER or the current buffer into an alist of chat messages."
   (with-current-buffer (or buffer (current-buffer))
     (let ((chat-string (buffer-string)))
-      (chatgpt-arcana-chat-string-to-alist chat-string))))
+      (chatgpt-arcana--chat-string-to-alist chat-string))))
 
-(defun conversation-alist-to-chat-buffer (chat-alist &optional buffer-name mode-to-enable skip-system)
+(defun chatgpt-arcana--conversation-alist-to-chat-buffer (chat-alist &optional buffer-name mode-to-enable skip-system)
   "Transforms CHAT-ALIST into a chat buffer.
 Note that is skip-system is t, the system prompts won't be sent again in future.
-It's basically a bug. Sorry about that."
+(Assuming you re-read the buffer). It's basically a bug. Sorry about that.
+I guess we should have a buffer-local variable that's actually the chat history.
+That would also let us fold bits of prompts etc."
   (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
         (chat-buffer (get-buffer-create (or buffer-name "*chatgpt-arcana-chat*"))))
     (with-current-buffer chat-buffer
@@ -453,7 +455,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
          (concat
           full-prompt
           chatgpt-arcana-chat-separator-assistant
-          (chatgpt-arcana--query-api-alist (chatgpt-arcana-chat-string-to-alist full-prompt)))))
+          (chatgpt-arcana--query-api-alist (chatgpt-arcana--chat-string-to-alist full-prompt)))))
       (chatgpt-arcana-chat-start-new-chat-response)
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (if chatgpt-arcana-chat-split-window
@@ -501,7 +503,7 @@ If no matching files are found, the function will display an error message."
 This function is async, but doesn't take a callback."
   (lexical-let ((buffer-name (buffer-name)))
     (chatgpt-arcana--query-api-alist-async
-     (chatgpt-arcana-chat-buffer-to-alist)
+     (chatgpt-arcana--chat-buffer-to-alist)
      (lambda (data)
        (let ((inserted-text data))
          (with-current-buffer buffer-name
