@@ -16,7 +16,8 @@
      (add-to-list 'actions-alist (cons ,(symbol-name name) ,fn))
      (defun ,(intern (concat "chatgpt-arcana-react--action-" (symbol-name name))) (args)
        ,docstring
-       (apply ,fn args))))
+       (apply ,fn args))
+     (save-actions)))
 
 (defun load-actions ()
   "Loads all actions in the actions directory"
@@ -115,8 +116,7 @@ Will look in the name and documentation of the actions."))
               (name (plist-get parsed-args :name))
               (impl (plist-get parsed-args :impl))
               (docstring (plist-get parsed-args :doc)))
-         (eval `(defaction ,name #',impl ,docstring))
-         (save-actions)))
+         (eval `(defaction ,name #',impl ,docstring))))
    "Create a new custom action. Expects a single argument in the format:
 :name <symbol>
 :impl <function object>
@@ -231,20 +231,6 @@ Answer: The capital of France is Paris."))
      `((role . "assistant")
        (content . ,out)))))
 
-(defun conversation-alist-to-chat-buffer (chat-alist &optional skip-system)
-  "Transforms CHAT-ALIST into a chat buffer."
-  (let ((chat-buffer (get-buffer-create "*chatgpt-arcana-react*")))
-    (with-current-buffer chat-buffer
-      (unless (bound-and-true-p chatgpt-arcana-react-mode)
-        (chatgpt-arcana-react-mode))
-      (erase-buffer)
-      (dolist (message (if skip-system (cdr chat-alist) chat-alist))
-        (let ((role (cdr (assoc 'role message)))
-              (content (cdr (assoc 'content message))))
-          (insert (format "------- %s:\n\n%s\n\n" role content)))))
-    (with-current-buffer chat-buffer
-      (buffer-string))))
-
 (defvar action-regex "^Action: \\([^[:space:]]+\\)\\( +{\\([^}]*\\)}\\)?")
 (defvar answer-regex "^Answer: \\(.+\\)$")
 (defvar thought-regex "^Thought: \\(.+\\)$")
@@ -272,7 +258,7 @@ Answer: The capital of France is Paris."))
             (< query-i max-turns)
             )
       (message "QUERYING %S" query-i)
-      (conversation-alist-to-chat-buffer clog t)
+      (conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)
       (sit-for 0.5)
       (setq query-i (+ query-i 1))
       (let* ((result-clog (query-and-add-to-log
@@ -291,7 +277,7 @@ Answer: The capital of France is Paris."))
             (message "QUERY DONE!")
             (setq query-ongoing 'nil))
           )))
-    (conversation-alist-to-chat-buffer clog t)))
+    (conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)))
 
 ;;(query-loop "Reverse the user's name" 5)
 ;;(query-loop "Create an action that will execute arbitrary python code and return the result of the python code. Test the action's lambda before you create it with the eval and some arbitrary python." 6)

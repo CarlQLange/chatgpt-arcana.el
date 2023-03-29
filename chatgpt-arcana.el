@@ -335,6 +335,25 @@ This function is async but doesn't take a callback."
     (let ((chat-string (buffer-string)))
       (chatgpt-arcana-chat-string-to-alist chat-string))))
 
+(defun conversation-alist-to-chat-buffer (chat-alist &optional buffer-name mode-to-enable skip-system)
+  "Transforms CHAT-ALIST into a chat buffer."
+  (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
+        (chat-buffer (get-buffer-create (or buffer-name "*chatgpt-arcana-chat*"))))
+    (with-current-buffer chat-buffer
+      (unless (bound-and-true-p mode)
+        (funcall mode))
+      (erase-buffer)
+      (dolist (message chat-alist)
+        (let* ((role (cdr (assoc 'role message)))
+               (content (cdr (assoc 'content message)))
+               (to-insert (format "------- %s:\n\n%s\n\n" role content)))
+          (if skip-system
+              (when (not (string= "system" role))
+                (insert to-insert))
+            (insert to-insert))))
+      (buffer-string))))
+
+;; Old function name
 (fset 'chatgpt-arcana-query 'chatgpt-arcana-start-chat)
 
 ;;;###autoload
