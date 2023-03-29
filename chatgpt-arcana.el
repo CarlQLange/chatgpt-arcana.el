@@ -336,7 +336,9 @@ This function is async but doesn't take a callback."
       (chatgpt-arcana-chat-string-to-alist chat-string))))
 
 (defun conversation-alist-to-chat-buffer (chat-alist &optional buffer-name mode-to-enable skip-system)
-  "Transforms CHAT-ALIST into a chat buffer."
+  "Transforms CHAT-ALIST into a chat buffer.
+Note that is skip-system is t, the system prompts won't be sent again in future.
+It's basically a bug. Sorry about that."
   (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
         (chat-buffer (get-buffer-create (or buffer-name "*chatgpt-arcana-chat*"))))
     (with-current-buffer chat-buffer

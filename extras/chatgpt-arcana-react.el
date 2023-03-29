@@ -204,7 +204,7 @@ From this point on, you MUST act in this loop according to the rules. You are a 
 (defconst initial-conversation-log-alist
   `(((role . "system") (content . ,react-initial-prompt))
     ((role . "system") (name . "example_user") (content . "Task: What is the capital of France?"))
-    ((role . "system") (name . "example_assistant") (content . "Thought: I should look up France on Wikipedia. Perhaps an action exists to do so.
+    ((role . "system") (name . "example_assistant") (content . "Thought: I should look up France on Wikipedia. I will check an action exists for that.
 Action: search-actions { wikipedia }
 PAUSE"))
     ((role . "system") (name . "example_user") (content . "Observation: No actions found matching wikipedia."))
