@@ -136,6 +136,26 @@ It simply logs out the given argument.\"
 }
 "))
 
+;; This one only works for a local searxNG instance.
+;; set it up yourself, it's genuinely really easy.
+(unless (action-defined-p "search-web")
+  (defaction
+   search-web
+   #'(lambda (query)
+       (let ((url (format "http://localhost:8080/search?format=json&q=%s" (url-hexify-string query))))
+         (with-temp-buffer
+           (url-insert-file-contents url)
+           (let* ((json-object-type 'plist)
+                  (search-results (json-read-from-string (buffer-string)))
+                  (results-list (plist-get search-results :results)))
+             (format "%s\n"
+                     (mapconcat #'(lambda (elem)
+                                    (concat (plist-get elem :title) "\n"
+                                            (plist-get elem :url) "\n"
+                                            (plist-get elem :content) "\n\n"))
+                                (cl-subseq results-list 0 5) ""))))))
+   "Return string results of internet search results. This can be used to eg. lookup wikipedia summaries and so on. This action is very useful."))
+
 (unless (action-defined-p "eval")
   (defaction
    eval
@@ -168,12 +188,10 @@ It simply logs out the given argument.\"
 (setq react-initial-prompt (format "
 You run in a loop of Thought, Action, PAUSE, Observation.
 At the end of the loop you output an Answer.
-Use Thought to describe your thoughts about the question you have been asked. You should always use Thought in a message, especially to reason about the expected outcome of an Action.
+Use Thought to describe your thoughts about the question you have been asked.
 You should always question whether the last Observation answers your task.
 Use Action to run one of the actions available to you - then return PAUSE. Only one Action per message is permitted.
-PAUSE indicates you are waiting for an Observation from an Action. You must wait for an Observation after PAUSE.
-YOU MAY NOT NOT UNDER ANY CIRCUMSTANCES WRITE ANYTHING AFTER PAUSE UNTIL CALLED AGAIN.
-Observation will be the result of running those actions. Do NOT predict the response. Do NOT write Observations yourself.
+Observation will be the result of running those actions.
 If you began your message with the string Answer, the loop is ended.
 You may only Answer after at least one Observation-PAUSE cycle.
 
@@ -191,36 +209,34 @@ here.
 Do NOT use triple backticks to wrap multiline arguments.
 The opening parenthesis MUST be on the same line as the action name or it will fail.
 
-The following is a list of some of the actions you can use.
 You should use the action search-actions to discover actions.
-You should verify an action exists before using one that does not exist in this list.
-
-Some actions:
-%s
 
 From this point on, you MUST act in this loop according to the rules. You are a computer program and not an assistant.
-" (list-actions)))
+"))
 
 (defconst initial-conversation-log-alist
   `(((role . "system") (content . ,react-initial-prompt))
     ((role . "system") (name . "example_user") (content . "Task: What is the capital of France?"))
-    ((role . "system") (name . "example_assistant") (content . "Thought: I should look up France on Wikipedia. I will check an action exists for that.
+    ((role . "system") (name . "example_assistant") (content . "Thought: I should look up France on the internet. I will check an action exists for that.
 Action: search-actions { wikipedia }
 PAUSE"))
-    ((role . "system") (name . "example_user") (content . "Observation: No actions found matching wikipedia."))
-    ((role . "system") (name . "example_assistant") (content . "Thought: I will have to run some Emacs lisp to look this up on Wikipedia.
-Action: eval { (with-current-buffer (url-retrieve-synchronously \"https://en.wikipedia.org/wiki/France\") (buffer-string))) }
+    ((role . "system") (name . "example_user") (content . "Observation: ((\"search-web\" . \"Return CSV results of internet search results. This can be used to eg. lookup wikipedia summaries and so on. This action is very useful.\"))"))
+    ((role . "system") (name . "example_assistant") (content . "Thought: I will use this action to look up the capital of France.
+Action: search-web { capital of France }
 PAUSE"))
-    ((role . "system") (name . "example_user") (content . "Observation: <the wikipedia page string>"))
-    ((role . "system") (name . "example_assistant") (content . "Thought: I have read the page and found the answer.
+    ((role . "system") (name . "example_user") (content . "Observation: <the search results>"))
+    ((role . "system") (name . "example_assistant") (content . "Thought: I have read the search results and determined the answer.
 Answer: The capital of France is Paris."))
     ))
+
+(dispatch-action "search-actions" "wikipedia")
 
 (defun append-to-list (clog pair)
   "Returns clog with pair appended"
   (append clog (list pair)))
 
 (defun last-message-content (alist)
+  (message "YOYOYO %S" alist)
   (cdr (assoc 'content (cdar (last alist)))))
 
 (defun query-and-add-to-log (clog query-pair)
@@ -231,10 +247,10 @@ Answer: The capital of France is Paris."))
      `((role . "assistant")
        (content . ,out)))))
 
-(defvar action-regex "^Action: \\([^[:space:]]+\\)\\( +{\\([^}]*\\)}\\)?")
-(defvar answer-regex "^Answer: \\(.+\\)$")
-(defvar thought-regex "^Thought: \\(.+\\)$")
-(defvar observation-regex "^Observation: \\(.+\\)$")
+(defvar action-regex "^Action: ?\\([^[:space:]]+\\)\\( +{\\([^}]*\\)}\\)?")
+(defvar answer-regex "^Answer: ?\\(.+\\)$")
+(defvar thought-regex "^Thought: ?\\(.+\\)$")
+(defvar observation-regex "^Observation: ?\\(.+\\)")
 
 (define-derived-mode chatgpt-arcana-react-mode gfm-mode "ChatGPT Arcana ReAct")
 
@@ -259,7 +275,7 @@ Answer: The capital of France is Paris."))
             )
       (message "QUERYING %S" query-i)
       (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)
-      (sit-for 0.5)
+      (sit-for 1)
       (setq query-i (+ query-i 1))
       (let* ((result-clog (query-and-add-to-log
                            clog
@@ -267,18 +283,21 @@ Answer: The capital of France is Paris."))
                              (content . ,next-prompt))))
              (result (last-message-content result-clog)))
         (setq clog result-clog)
-        (if (string-match action-regex result)
-            (setq next-prompt
-                  (format "Observation: %s"
-                          (dispatch-action
-                           (match-string-no-properties 1 result)
-                           (match-string-no-properties 3 result))))
-          (progn
-            (message "QUERY DONE!")
-            (setq query-ongoing 'nil))
-          )))
+        (if (not result)
+            (setq next-prompt "Observation: No output from previous action. Perhaps an error.")
+          (if (string-match action-regex result)
+              (setq next-prompt
+                    (format "Observation: %s"
+                            (dispatch-action
+                             (match-string-no-properties 1 result)
+                             (match-string-no-properties 3 result))))
+            (progn
+              (message "QUERY DONE!")
+              (setq query-ongoing 'nil))
+            ))))
     (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)))
 
 ;;(query-loop "Reverse the user's name" 5)
 ;;(query-loop "Create an action that will execute arbitrary python code and return the result of the python code. Test the action's lambda before you create it with the eval and some arbitrary python." 6)
 ;;(dispatch-action "count-tokens-in-string" '(react-initial-prompt))
+;;(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
