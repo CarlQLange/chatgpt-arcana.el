@@ -456,7 +456,7 @@ That would also let us fold bits of prompts etc."
   (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
         (chat-buffer (get-buffer-create (or buffer-name "*chatgpt-arcana-chat*"))))
     (with-current-buffer chat-buffer
-      (unless (bound-and-true-p mode)
+      (when mode
         (funcall mode))
       (erase-buffer)
       (dolist (message chat-alist)
