@@ -368,16 +368,17 @@ Returns the truncated alist."
     new-alist))
 
 (defun chatgpt-arcana--token-overflow-truncate-keep-first-user (chat-alist token-goal)
-  (let* ((first-user-message (cl-find-if (lambda (m) (string= (assoc 'role m) "user")) chat-alist))
-         (token-count (- 0 (chatgpt-arcana--token-count-approximation (assoc 'content first-user-message))))
+  ;; This is horrible, I'm certain there's a nice cl-loop macro for it instead...
+  (let* ((first-user-message (cl-find-if (lambda (m) (string= (cdr (assoc 'role m)) "user")) chat-alist))
+         (token-count (- 0 (chatgpt-arcana--token-count-approximation (cdr (assoc 'content first-user-message)))))
         new-alist)
     (cl-loop for msg in (nreverse chat-alist)
              sum (chatgpt-arcana--token-count-approximation (cdr (assoc 'content msg))) into current-tokens
-             when (< current-tokens  token-goal)
+             when (< current-tokens token-goal)
                do (push (cl-remove nil `(,(assoc 'name msg)
                           ,(assoc 'role msg)
                           ,(assoc 'content msg))) new-alist))
-    (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (assoc 'role m) "assistant")) new-alist)))
+    (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (cdr (assoc 'role m)) "assistant")) new-alist)))
       (when (not (eq (car new-alist) first-user-message))
         (setq new-alist (-insert-at first-assistant-message-pos first-user-message new-alist)))
       new-alist)))
