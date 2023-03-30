@@ -1,5 +1,10 @@
 (require 'chatgpt-arcana)
 
+(when (package-installed-p 'memoize)
+  (require 'memoize)
+  (unless (get 'chatgpt-arcana--token-overflow-summarize-each--summarize-message :memoize-original-function)
+    (memoize 'chatgpt-arcana--token-overflow-summarize-each--summarize-message)))
+
 (defvar actions-alist '())
 
 (defgroup chatgpt-arcana-react nil
@@ -283,7 +288,7 @@ Answer: The capital of France is Paris."))
                            `((role . "user")
                              (content . ,next-prompt))))
              (result (last-message-content result-clog)))
-        (setq clog (chatgpt-arcana--handle-token-overflow result-clog 3000 "truncate-keep-first-user"))
+        (setq clog (chatgpt-arcana--handle-token-overflow result-clog 1000 "summarize-each"))
         (if (not result)
             (setq next-prompt "Observation: No output from previous action. Perhaps an error.")
           (if (string-match action-regex result)
@@ -300,4 +305,4 @@ Answer: The capital of France is Paris."))
 
 ;;(query-loop "Reverse the user's name" 5)
 ;;(dispatch-action "count-tokens-in-string" '(react-initial-prompt))
-;;(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
+(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
