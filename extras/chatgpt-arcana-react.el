@@ -16,8 +16,7 @@
      (add-to-list 'actions-alist (cons ,(symbol-name name) ,fn))
      (defun ,(intern (concat "chatgpt-arcana-react--action-" (symbol-name name))) (args)
        ,docstring
-       (apply ,fn args))
-     (save-actions)))
+       (apply ,fn args))))
 
 (defun load-actions ()
   "Loads all actions in the actions directory"
@@ -177,6 +176,9 @@ It simply logs out the given argument.\"
   otherwise only the first sexp will be executed.
   Always use a built-in action instead of eval-ing code if you can."))
 
+;; Save initial actions.
+(save-actions)
+
 (defun dispatch-action (name &optional args)
   (if (assoc name actions-alist)
       (let ((action (cdr (assoc name actions-alist))))
@@ -260,8 +262,8 @@ Answer: The capital of France is Paris."))
    (,thought-regex 1 font-lock-keyword-face)
    (,answer-regex 1 font-lock-keyword-face)
    (,observation-regex 1 font-lock-keyword-face)
-   (,action-regex 1 font-lock-constant-face)
-   (,action-regex 3 font-lock-string-face)))
+   (,action-regex (1 font-lock-constant-face)
+                  (3 font-lock-string-face nil t))))
 
 (defun query-loop (question max-turns)
   (let ((clog initial-conversation-log-alist)
@@ -273,7 +275,7 @@ Answer: The capital of France is Paris."))
             (< query-i max-turns)
             )
       (message "QUERYING %S" query-i)
-      (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)
+      (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode)
       (sit-for 1)
       (setq query-i (+ query-i 1))
       (let* ((result-clog (query-and-add-to-log
@@ -281,7 +283,7 @@ Answer: The capital of France is Paris."))
                            `((role . "user")
                              (content . ,next-prompt))))
              (result (last-message-content result-clog)))
-        (setq clog result-clog)
+        (setq clog (chatgpt-arcana--handle-token-overflow result-clog 3000 "truncate-keep-first-user"))
         (if (not result)
             (setq next-prompt "Observation: No output from previous action. Perhaps an error.")
           (if (string-match action-regex result)
@@ -294,9 +296,8 @@ Answer: The capital of France is Paris."))
               (message "QUERY DONE!")
               (setq query-ongoing 'nil))
             ))))
-    (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode t)))
+    (chatgpt-arcana--conversation-alist-to-chat-buffer clog "*chatgpt-arcana-react*" 'chatgpt-arcana-react-mode)))
 
 ;;(query-loop "Reverse the user's name" 5)
-;;(query-loop "Create an action that will execute arbitrary python code and return the result of the python code. Test the action's lambda before you create it with the eval and some arbitrary python." 6)
 ;;(dispatch-action "count-tokens-in-string" '(react-initial-prompt))
 ;;(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
