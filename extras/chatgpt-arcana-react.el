@@ -300,4 +300,4 @@ Answer: The capital of France is Paris."))
 
 ;;(query-loop "Reverse the user's name" 5)
 ;;(dispatch-action "count-tokens-in-string" '(react-initial-prompt))
-(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
+;;(query-loop "How many long distance trails are in Ireland according to Tough Soles?" 4)
