@@ -154,7 +154,7 @@ It simply logs out the given argument.\"
                                             (plist-get elem :url) "\n"
                                             (plist-get elem :content) "\n\n"))
                                 (cl-subseq results-list 0 5) ""))))))
-   "Return string results of internet search results. This can be used to eg. lookup wikipedia summaries and so on. This action is very useful."))
+   "Return string results of internet search results from SearxNG. This can be used to eg. lookup wikipedia summaries and so on. This action is very useful."))
 
 (unless (action-defined-p "eval")
   (defaction
@@ -236,7 +236,6 @@ Answer: The capital of France is Paris."))
   (append clog (list pair)))
 
 (defun last-message-content (alist)
-  (message "YOYOYO %S" alist)
   (cdr (assoc 'content (cdar (last alist)))))
 
 (defun query-and-add-to-log (clog query-pair)
