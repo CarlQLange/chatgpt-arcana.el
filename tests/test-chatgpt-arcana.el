@@ -36,4 +36,4 @@
         (expected-alist `(((role . "bot") (content . ,(make-string (* 9 4) ?d)))
                            ((role . "user") (content . ,(make-string (* 10 4) ?e)))
                            ((role . "bot") (content . ,(make-string (* 10 4) ?f))))))
-    (should (equal (chatgpt-arcana--token-overflow-truncate-2 chat-alist 30) expected-alist))))
+    (should (equal (chatgpt-arcana--token-overflow-truncate chat-alist 30) expected-alist))))

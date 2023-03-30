@@ -335,6 +335,11 @@ This function is async but doesn't take a callback."
   (with-current-buffer (or buffer (current-buffer))
     (chatgpt-arcana--token-count-approximation (buffer-string))))
 
+(defun chatgpt-arcana--token-count-alist (chat-alist)
+  "Returns total count of the 'content fields in the CHAT-ALIST"
+  (cl-loop for c in (mapcar (lambda (m) (cdr (assoc 'content m))) chat-alist)
+           sum (chatgpt-arcana--token-count-approximation c)))
+
 (defcustom chatgpt-arcana-token-overflow-summarize-strategy-system-prompt
   "You are a professional summarizer.
 Describe and summarize the following chat message. Be as concise as possible. If necessary, elide words.
@@ -387,18 +392,17 @@ This may cost money, take time, and the resulting chat may not be that much smal
                                      (content . ,content)))))))
     new-messages))
 
-(defun chatgpt-arcana--handle-token-overflow (string &optional token-goal)
+(defun chatgpt-arcana--handle-token-overflow (chat-alist &optional token-goal)
   (let ((token-goal (or token-goal 3000)))
-    (if (> (chatgpt-arcana--token-count-buffer) 3000)
-      (message "Chat overflow has been detected, using %S strategy to handle." chatgpt-arcana-token-overflow-strategy)
+    (if (> (chatgpt-arcana--token-count-alist chat-alist) token-goal)
       (cond ((string= chatgpt-arcana-token-overflow-strategy "truncate")
-             (chatgpt-arcana--token-overflow-truncate string token-goal))
+             (chatgpt-arcana--token-overflow-truncate chat-alist token-goal))
             ((string= chatgpt-arcana-token-overflow-strategy "summarize-each")
-             (chatgpt-arcana--token-overflow-summarize-each string token-goal))
+             (chatgpt-arcana--token-overflow-summarize-each chat-alist token-goal))
             (t (progn
                  (message "No strategy in use to handle chat overflow. Request will probably fail.")
-                 string)))
-      string)))
+                 chat-alist)))
+      chat-alist)))
 
 (defun chatgpt-arcana--chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
@@ -407,14 +411,15 @@ This may cost money, take time, and the resulting chat may not be that much smal
     (with-temp-buffer
       (insert chat-string)
       (goto-char (point-min))
-      (while (search-forward-regexp regex nil t)
+      (reverse (while (search-forward-regexp regex nil t)
         (let* ((role (match-string-no-properties 1))
                (start (point))
                (end (when (save-excursion (search-forward-regexp regex nil t))
                       (match-beginning 0)))
                (content (buffer-substring-no-properties start (or end (point-max)))))
-          (push `((role . ,role) (content . ,(string-trim content))) messages))))
-    (chatgpt-arcana--handle-token-overflow (reverse messages) chatgpt-arcana-token-overflow-token-goal)))
+          (push `((role . ,role) (content . ,(string-trim content))) messages)))))
+    (message "MESSAGES YO %S" messages)
+    (chatgpt-arcana--handle-token-overflow messages chatgpt-arcana-token-overflow-token-goal)))
 
 (defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
   "Transforms the specified BUFFER or the current buffer into an alist of chat messages."
@@ -539,6 +544,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
                    system-prompt
                    chatgpt-arcana-chat-separator-user
                    prompt (and selected-region (concat "\n\n"selected-region)))))
+         (message "YO HELLO %s" full-prompt)
          (concat
           full-prompt
           chatgpt-arcana-chat-separator-assistant
