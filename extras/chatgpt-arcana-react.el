@@ -1,10 +1,5 @@
 (require 'chatgpt-arcana)
 
-(when (package-installed-p 'memoize)
-  (require 'memoize)
-  (unless (get 'chatgpt-arcana--token-overflow-summarize-each--summarize-message :memoize-original-function)
-    (memoize 'chatgpt-arcana--token-overflow-summarize-each--summarize-message)))
-
 (defvar actions-alist '())
 
 (defgroup chatgpt-arcana-react nil
