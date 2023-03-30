@@ -389,7 +389,7 @@ This may cost money, take time, and the resulting chat may not be that much smal
 
 (defun chatgpt-arcana--handle-token-overflow (string &optional token-goal)
   (let ((token-goal (or token-goal 3000)))
-    (when (> (chatgpt-arcana--token-count-buffer) 3000)
+    (if (> (chatgpt-arcana--token-count-buffer) 3000)
       (message "Chat overflow has been detected, using %S strategy to handle." chatgpt-arcana-token-overflow-strategy)
       (cond ((string= chatgpt-arcana-token-overflow-strategy "truncate")
              (chatgpt-arcana--token-overflow-truncate string token-goal))
@@ -397,7 +397,8 @@ This may cost money, take time, and the resulting chat may not be that much smal
              (chatgpt-arcana--token-overflow-summarize-each string token-goal))
             (t (progn
                  (message "No strategy in use to handle chat overflow. Request will probably fail.")
-                 string))))))
+                 string)))
+      string)))
 
 (defun chatgpt-arcana--chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
