@@ -389,6 +389,11 @@ Returns the truncated alist."
    `(((role . "system") (content . ,chatgpt-arcana-token-overflow-summarize-strategy-system-prompt))
      ((role . "user") (content . ,(concat "Here is the message to summarize\n\n" content))))))
 
+(when (and (bound-and-true-p 'package-installed-p) (package-installed-p 'memoize))
+  (require 'memoize)
+  (unless (get 'chatgpt-arcana--token-overflow-summarize-each--summarize-message :memoize-original-function)
+    (memoize 'chatgpt-arcana--token-overflow-summarize-each--summarize-message)))
+
 (defun chatgpt-arcana--token-overflow-summarize-each (chat-alist token-goal)
   "Calls the API on each message to summarize it, starting at the top, until the token count is below TOKEN-GOAL.
 This may cost money, take time, and the resulting chat may not be that much smaller."
