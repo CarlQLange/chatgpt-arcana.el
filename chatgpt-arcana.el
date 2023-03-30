@@ -15,6 +15,7 @@
 
 (require 'url)
 (require 'json)
+(require 'dash)
 (require 'cl)
 (require 'cl-lib)
 (require 'request)
@@ -107,8 +108,10 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
   "Strategy to handle token overflow.
    Possible values are \"cutoff\" to truncate the input,
    \"summarize-each\" to summarize the prior input."
-  :type '(choice (const :tag "Truncate" "truncate")
-                 (const :tag "Summarize each message (not well-tested)" "summarize-each"))
+  :type '(choice
+          (const :tag "Truncate" "truncate")
+          (const :tag "Truncate but keep first user message" "truncate-keep-first-user")
+          (const :tag "Summarize each message (not well-tested)" "summarize-each"))
   :group 'chatgpt-arcana)
 
 (defcustom chatgpt-arcana-token-overflow-token-goal 3000
@@ -364,6 +367,21 @@ Returns the truncated alist."
                           ,(assoc 'content msg))) new-alist))
     new-alist))
 
+(defun chatgpt-arcana--token-overflow-truncate-keep-first-user (chat-alist token-goal)
+  (let* ((first-user-message (cl-find-if (lambda (m) (string= (assoc 'role m) "user")) chat-alist))
+         (token-count (- 0 (chatgpt-arcana--token-count-approximation (assoc 'content first-user-message))))
+        new-alist)
+    (cl-loop for msg in (nreverse chat-alist)
+             sum (chatgpt-arcana--token-count-approximation (cdr (assoc 'content msg))) into current-tokens
+             when (< current-tokens  token-goal)
+               do (push (cl-remove nil `(,(assoc 'name msg)
+                          ,(assoc 'role msg)
+                          ,(assoc 'content msg))) new-alist))
+    (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (assoc 'role m) "assistant")) new-alist)))
+      (when (not (eq (car new-alist) first-user-message))
+        (setq new-alist (-insert-at first-assistant-message-pos first-user-message new-alist)))
+      new-alist)))
+
 (defun chatgpt-arcana--token-overflow-summarize-each--summarize-message (content)
   (chatgpt-arcana--query-api-alist
    `(((role . "system") (content . ,chatgpt-arcana-token-overflow-summarize-strategy-system-prompt))
@@ -392,16 +410,19 @@ This may cost money, take time, and the resulting chat may not be that much smal
                                      (content . ,content)))))))
     new-messages))
 
-(defun chatgpt-arcana--handle-token-overflow (chat-alist &optional token-goal)
-  (let ((token-goal (or token-goal 3000)))
+(defun chatgpt-arcana--handle-token-overflow (chat-alist &optional token-goal strategy-override)
+  (let ((token-goal (or token-goal 3000))
+        (strategy (or strategy-override chatgpt-arcana-token-overflow-strategy)))
     (if (> (chatgpt-arcana--token-count-alist chat-alist) token-goal)
-      (cond ((string= chatgpt-arcana-token-overflow-strategy "truncate")
-             (chatgpt-arcana--token-overflow-truncate chat-alist token-goal))
-            ((string= chatgpt-arcana-token-overflow-strategy "summarize-each")
-             (chatgpt-arcana--token-overflow-summarize-each chat-alist token-goal))
-            (t (progn
-                 (message "No strategy in use to handle chat overflow. Request will probably fail.")
-                 chat-alist)))
+        (cond ((string= strategy "truncate")
+               (chatgpt-arcana--token-overflow-truncate chat-alist token-goal))
+              ((string= strategy "truncate-keep-first-user")
+               (chatgpt-arcana--token-overflow-truncate-keep-first-user chat-alist token-goal))
+              ((string= strategy "summarize-each")
+               (chatgpt-arcana--token-overflow-summarize-each chat-alist token-goal))
+              (t (progn
+                   (message "No strategy in use to handle chat overflow. Request will probably fail.")
+                   chat-alist)))
       chat-alist)))
 
 (defun chatgpt-arcana--chat-string-to-alist (chat-string)
