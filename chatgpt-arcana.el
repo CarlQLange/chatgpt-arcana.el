@@ -418,7 +418,6 @@ This may cost money, take time, and the resulting chat may not be that much smal
                       (match-beginning 0)))
                (content (buffer-substring-no-properties start (or end (point-max)))))
           (push `((role . ,role) (content . ,(string-trim content))) messages)))))
-    (message "MESSAGES YO %S" messages)
     (chatgpt-arcana--handle-token-overflow messages chatgpt-arcana-token-overflow-token-goal)))
 
 (defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
