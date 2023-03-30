@@ -418,7 +418,7 @@ This may cost money, take time, and the resulting chat may not be that much smal
                       (match-beginning 0)))
                (content (buffer-substring-no-properties start (or end (point-max)))))
           (push `((role . ,role) (content . ,(string-trim content))) messages)))))
-    (chatgpt-arcana--handle-token-overflow messages chatgpt-arcana-token-overflow-token-goal)))
+    (chatgpt-arcana--handle-token-overflow (reverse messages) chatgpt-arcana-token-overflow-token-goal)))
 
 (defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
   "Transforms the specified BUFFER or the current buffer into an alist of chat messages."
