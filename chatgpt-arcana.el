@@ -389,7 +389,7 @@ Returns the truncated alist."
    `(((role . "system") (content . ,chatgpt-arcana-token-overflow-summarize-strategy-system-prompt))
      ((role . "user") (content . ,(concat "Here is the message to summarize\n\n" content))))))
 
-(when (and (bound-and-true-p 'package-installed-p) (package-installed-p 'memoize))
+(when (and (bound-and-true-p package-installed-p) (package-installed-p 'memoize))
   (require 'memoize)
   (unless (get 'chatgpt-arcana--token-overflow-summarize-each--summarize-message :memoize-original-function)
     (memoize 'chatgpt-arcana--token-overflow-summarize-each--summarize-message)))
