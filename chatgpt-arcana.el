@@ -571,7 +571,6 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
                    system-prompt
                    chatgpt-arcana-chat-separator-user
                    prompt (and selected-region (concat "\n\n"selected-region)))))
-         (message "YO HELLO %s" full-prompt)
          (concat
           full-prompt
           chatgpt-arcana-chat-separator-assistant
