@@ -464,26 +464,31 @@ This may cost money, take time, and the resulting chat may not be that much smal
     (let ((chat-string (buffer-string)))
       (chatgpt-arcana--chat-string-to-alist chat-string))))
 
-(defun chatgpt-arcana--conversation-alist-to-chat-buffer (chat-alist &optional buffer-name mode-to-enable skip-system)
-  "Transforms CHAT-ALIST into a chat buffer.
-Note that is skip-system is t, the system prompts won't be sent again in future.
-(Assuming you re-read the buffer). It's basically a bug. Sorry about that.
-I guess we should have a buffer-local variable that's actually the chat history.
-That would also let us fold bits of prompts etc."
+(defconst chatgpt-arcana--default-chat-buffer-name "*chatgpt-arcana-chat*"
+  "The default name of the chat buffer.")
+
+(defun chatgpt-arcana--conversation-alist-to-chat-buffer (chat-messages
+                                                           &optional buffer-name mode-to-enable skip-system)
+  "Transform CHAT-MESSAGES into a chat buffer.
+
+If SKIP-SYSTEM is non-nil, skip messages where the role is \"system\".
+If MODE-TO-ENABLE is non-nil, enable the specified major mode in the buffer.
+If BUFFER-NAME is nil, use the default buffer name."
   (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
-        (chat-buffer (get-buffer-create (or buffer-name "*chatgpt-arcana-chat*"))))
+        (buffer-name (or buffer-name chatgpt-arcana--default-chat-buffer-name))
+        (chat-buffer (get-buffer-create buffer-name)))
     (with-current-buffer chat-buffer
       (when mode
         (funcall mode))
       (erase-buffer)
-      (dolist (message chat-alist)
-        (let* ((role (cdr (assoc 'role message)))
-               (content (cdr (assoc 'content message)))
-               (to-insert (format "------- %s:\n\n%s\n\n" role content)))
-          (if skip-system
-              (when (not (string= "system" role))
-                (insert to-insert))
-            (insert to-insert))))
+      (dolist (message chat-messages)
+        (let ((role (cdr (assoc 'role message)))
+              (content (cdr (assoc 'content message))))
+          (when (or (not skip-system) (not (string= "system" role)))
+            (insert
+             (format
+              "%s %s:\n\n%s\n\n"
+              chatgpt-arcana-chat-separator-line role content)))))
       (buffer-string))))
 
 ;; Old function name
