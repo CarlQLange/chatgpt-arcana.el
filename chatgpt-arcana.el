@@ -185,8 +185,10 @@ This function is async but doesn't take a callback."
     ("^--[-]+" . font-lock-comment-face)))
 
 (defun chatgpt-arcana-chat--wrap-region (selected-region mode)
-  "Wrap the SELECTED-REGION in triple backticks with the code identifier for the given MODE if the MODE
-is derived from `prog-mode'. Otherwise, return just the SELECTED-REGION as is."
+  "Wrap SELECTED-REGION in triple backticks with the code identifier for MODE.
+Only applies if MODE is derived from `prog-mode'. Otherwise, just returns
+SELECTED-REGION as is. This uses `markdown-code-lang-modes' to look up the lang
+string, so you may wish to extend that."
   (if (derived-mode-p 'prog-mode)
       (let ((lang (or (car (rassoc mode markdown-code-lang-modes)) "")))
         (format "```%s\n%s\n```" lang selected-region))
