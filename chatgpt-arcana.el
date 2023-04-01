@@ -202,9 +202,9 @@ string, so you may wish to extend that."
   "Return the system prompt based on the provided MODE-NAME, or the fallback prompt if the mode is not found or MODE-NAME is nil.
 If CONCAT-MODE-TO-PROMPT is set, will add the current major mode to the system prompt."
   (let* ((mode-name (or mode-name 'fallback))
-         (prompt-identifier (cdr (assoc mode-name chatgpt-arcana-system-prompts-modes-alist)))
-         (system-prompt (or (cdr (assoc prompt-identifier chatgpt-arcana-system-prompts-alist))
-                            (cdr (assoc 'fallback chatgpt-arcana-system-prompts-alist)))))
+         (prompt-identifier (alist-get mode-name chatgpt-arcana-system-prompts-modes-alist))
+         (system-prompt (or (alist-get prompt-identifier chatgpt-arcana-system-prompts-alist)
+                            (alist-get 'fallback chatgpt-arcana-system-prompts-alist))))
     (if concat-mode-to-prompt
         (concat system-prompt " Current Emacs major mode: " (symbol-name mode-name) ".")
       system-prompt)))
@@ -350,7 +350,7 @@ This function is async but doesn't take a callback."
 
 (defun chatgpt-arcana--token-count-alist (chat-alist)
   "Returns total count of the 'content fields in the CHAT-ALIST"
-  (cl-loop for c in (mapcar (lambda (m) (cdr (assoc 'content m))) chat-alist)
+  (cl-loop for c in (mapcar (lambda (m) (alist-get 'content m)) chat-alist)
            sum (chatgpt-arcana--token-count-approximation c)))
 
 (defcustom chatgpt-arcana-token-overflow-summarize-strategy-system-prompt
@@ -371,7 +371,7 @@ Returns the truncated alist."
   (let ((token-count 0)
         new-alist)
     (cl-loop for msg in (nreverse chat-alist)
-             sum (chatgpt-arcana--token-count-approximation (cdr (assoc 'content msg))) into current-tokens
+             sum (chatgpt-arcana--token-count-approximation (alist-get 'content msg)) into current-tokens
              when (< current-tokens token-goal)
                do (push (cl-remove nil `(,(assoc 'name msg)
                           ,(assoc 'role msg)
@@ -380,16 +380,16 @@ Returns the truncated alist."
 
 (defun chatgpt-arcana--token-overflow-truncate-keep-first-user (chat-alist token-goal)
   ;; This is horrible, I'm certain there's a nice cl-loop macro for it instead...
-  (let* ((first-user-message (cl-find-if (lambda (m) (string= (cdr (assoc 'role m)) "user")) chat-alist))
-         (token-count (- 0 (chatgpt-arcana--token-count-approximation (cdr (assoc 'content first-user-message)))))
+  (let* ((first-user-message (cl-find-if (lambda (m) (string= (alist-get 'role m) "user")) chat-alist))
+         (token-count (- 0 (chatgpt-arcana--token-count-approximation (alist-get 'content first-user-message))))
         new-alist)
     (cl-loop for msg in (nreverse chat-alist)
-             sum (chatgpt-arcana--token-count-approximation (cdr (assoc 'content msg))) into current-tokens
+             sum (chatgpt-arcana--token-count-approximation (alist-get 'content msg)) into current-tokens
              when (< current-tokens token-goal)
                do (push (cl-remove nil `(,(assoc 'name msg)
                           ,(assoc 'role msg)
                           ,(assoc 'content msg))) new-alist))
-    (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (cdr (assoc 'role m)) "assistant")) new-alist)))
+    (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (alist-get 'role m) "assistant")) new-alist)))
       (when (not (eq (car new-alist) first-user-message))
         (setq new-alist (-insert-at first-assistant-message-pos first-user-message new-alist)))
       new-alist)))
@@ -411,16 +411,16 @@ This may cost money, take time, and the resulting chat may not be that much smal
          (token-count
           (apply
            #'+
-           (mapcar (lambda (m) (chatgpt-arcana--token-count-approximation (cdr (assoc 'content m)))) messages)))
+           (mapcar (lambda (m) (chatgpt-arcana--token-count-approximation (alist-get 'content m))) messages)))
          (new-messages (cl-loop for item in messages
                   collect
-                  (let* ((role (cdr (assoc 'role item)))
-                         (name (cdr (assoc 'name item)))
+                  (let* ((role (alist-get 'role item))
+                         (name (alist-get 'name item))
                          (content
                           (if (> token-count token-goal)
                               (chatgpt-arcana--token-overflow-summarize-each--summarize-message
-                               (cdr (assoc 'content item)))
-                            (cdr (assoc 'content item)))))
+                               (alist-get 'content item))
+                            (alist-get 'content item))))
                     (setq token-count (- token-count (chatgpt-arcana--token-count-approximation content)))
                     (cl-remove nil `((role . ,role)
                                      ,(when name `(name . ,name))
@@ -482,8 +482,8 @@ If BUFFER-NAME is nil, use the default buffer name."
         (funcall mode))
       (erase-buffer)
       (dolist (message chat-messages)
-        (let ((role (cdr (assoc 'role message)))
-              (content (cdr (assoc 'content message))))
+        (let ((role (alist-get 'role message))
+              (content (alist-get 'content message)))
           (when (or (not skip-system) (not (string= "system" role)))
             (insert
              (format

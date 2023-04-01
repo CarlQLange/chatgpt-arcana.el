@@ -181,7 +181,7 @@ It simply logs out the given argument.\"
 
 (defun dispatch-action (name &optional args)
   (if (assoc name actions-alist)
-      (let ((action (cdr (assoc name actions-alist))))
+      (let ((action (alist-get name actions-alist)))
         (if args
             (funcall action args)
           (funcall action)))
@@ -238,7 +238,7 @@ Answer: The capital of France is Paris."))
   (append clog (list pair)))
 
 (defun last-message-content (alist)
-  (cdr (assoc 'content (cdar (last alist)))))
+  (alist-get 'content (cdar (last alist))))
 
 (defun query-and-add-to-log (clog query-pair)
   (let* ((query-alist (append-to-list clog query-pair))
