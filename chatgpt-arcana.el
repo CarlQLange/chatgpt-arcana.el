@@ -184,6 +184,14 @@ This function is async but doesn't take a callback."
   '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
     ("^--[-]+" . font-lock-comment-face)))
 
+(defun chatgpt-arcana-chat--wrap-region (selected-region mode)
+  "Wrap the SELECTED-REGION in triple backticks with the code identifier for the given MODE if the MODE
+is derived from `prog-mode'. Otherwise, return just the SELECTED-REGION as is."
+  (if (derived-mode-p 'prog-mode)
+      (let ((lang (or (car (rassoc mode markdown-code-lang-modes)) "")))
+        (format "```%s\n%s\n```" lang selected-region))
+    selected-region))
+
 (defun chatgpt-arcana-get-system-prompt ()
   "Return the system prompt based on the current major mode, or the fallback prompt if the mode is not found."
   (chatgpt-arcana-get-system-prompt-for-mode-name major-mode t))
@@ -559,7 +567,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   (interactive (list (completing-read "System Prompt: " (mapcar #'cdr chatgpt-arcana-system-prompts-alist))
                      (completing-read "Prompt: " (mapcar #'cdr chatgpt-arcana-common-prompts-alist))))
   (let*
-      ((selected-region (and (use-region-p) (buffer-substring-no-properties (mark) (point)))))
+      ((selected-region (and (use-region-p) (chatgpt-arcana-chat--wrap-region (buffer-substring-no-properties (mark) (point)) major-mode))))
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
       (erase-buffer)
@@ -570,7 +578,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
                    chatgpt-arcana-chat-separator-system
                    system-prompt
                    chatgpt-arcana-chat-separator-user
-                   prompt (and selected-region (concat "\n\n"selected-region)))))
+                   prompt (and selected-region (concat "\n\n" selected-region)))))
          (concat
           full-prompt
           chatgpt-arcana-chat-separator-assistant
