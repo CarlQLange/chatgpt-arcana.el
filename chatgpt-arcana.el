@@ -648,9 +648,8 @@ This function is async, but doesn't take a callback."
              (insert inserted-text)
              (chatgpt-arcana-chat-start-new-chat-response)
              (when chatgpt-arcana-chat-autosave-enabled
-               (chatgpt-arcana-chat-save-to-autosave-file buffer-name)
-                ; since saving to autosave opens that file, we need to move the pointer again
-               (goto-char (point-max))))))))))
+               (chatgpt-arcana-chat-save-to-autosave-file buffer-name)))
+           (goto-char (point-max))))))))
 
 (defun chatgpt-arcana-chat-send-message ()
   "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer.
