@@ -80,3 +80,19 @@ Observation: "egnaL lraC"
 
 Answer: The reverse of "Carl Lange" is "egnaL lraC".
 ```
+
+
+## ChatGPT Arcana Eshell
+
+Sick of staring into the abyss of your terminal, trying to remember how to invoke `tar`? Don't despair - with ChatGPT-arcana, you can generate complex shell commands from natural language descriptions in no time flat. Just type `spell tar this directory` and watch the magic unfold.
+
+```
+~/Desktop $ ls
+2023-03-31 12-44-10.mkv
+~/Desktop $ spell convert this mkv into mp4
+~/Desktop $ ffmpeg -i 2023-03-31\ 12-44-10.mkv 2023-03-31\ 12-44-10.mp4
+```
+
+But like they tell us all in wizard school: with great power comes great responsibility. You should still know what the command is doing - it absolutely 100% will with no qualms tell you how to destroy the universe (`rm -rf /`).
+
+Also, this command by default sends an `ls` of the current directory and the first 500 bytes of any named files to the ChatGPT API.
