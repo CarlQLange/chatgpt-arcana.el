@@ -84,7 +84,7 @@ Answer: The reverse of "Carl Lange" is "egnaL lraC".
 
 ## ChatGPT Arcana Eshell
 
-Sick of staring into the abyss of your terminal, trying to remember how to invoke `tar`? Don't despair - with ChatGPT-arcana, you can generate complex shell commands from natural language descriptions in no time flat. Just type `spell tar this directory` and ChatGPT will insert the command to do what you want on the next line. All you need to do is press enter.
+Sick of staring into the abyss of your terminal, trying to remember how to invoke `tar`? Don't despair - with ChatGPT-arcana, you can generate complex shell commands from natural language descriptions. Just type `spell tar this directory` and ChatGPT will insert the command to do what you want on the next line. All you need to do is press enter.
 
 ```
 ~/Desktop $ ls

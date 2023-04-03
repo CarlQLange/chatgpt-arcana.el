@@ -98,9 +98,11 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
   :type '(alist :key-type symbol :value-type symbol)
   :group 'chatgpt-arcana)
 
-(defcustom chatgpt-arcana-chat-split-window t
-  "Whether chat session starts in a split or not."
-  :type 'boolean
+(defcustom chatgpt-arcana-chat-split-window 'horizontal
+  "Specifies how the chat session window is split: vertically, horizontally, or not at all."
+  :type '(choice (const :tag "horizontal" horizontal)
+                 (const :tag "vertical" vertical)
+                 (const :tag "none" nil))
   :group 'chatgpt-arcana-chat)
 
 (defcustom chatgpt-arcana-token-overflow-strategy "truncate"
@@ -593,7 +595,9 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
       (chatgpt-arcana-chat-start-new-chat-response)
       (unless (get-buffer-window "*chatgpt-arcana-response*")
         (if chatgpt-arcana-chat-split-window
-            (split-window-horizontally))
+            (if (eq chatgpt-arcana-chat-split-window 'vertical)
+                (split-window-vertically)
+              (split-window-horizontally)))
         (switch-to-buffer "*chatgpt-arcana-response*")))))
 
 ;;;###autoload
