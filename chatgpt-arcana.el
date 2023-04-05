@@ -120,6 +120,12 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
   :type 'number
   :group 'chatgpt-arcana)
 
+(defcustom chatgpt-arcana-insert-context-placeholder "[XXXX]"
+  "A placeholder inserted into context so the model knows where it'll insert to.
+If this string shows up in your code, you'll want to change it."
+  :type 'string
+  :group 'chatgpt-arcana)
+
 (defun chatgpt-arcana-chat-save-to-autosave-file (&optional buffer)
   "Save the current buffer, or the given BUFFER, to an autosave file and open it.
 Or, just write the file if it already exists.
@@ -525,32 +531,30 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
                              `(((role . "system") (content . ,(chatgpt-arcana-get-system-prompt-for-mode-name major-mode t)))
                                ((role . "user") (content . ,input))))))
         (when selected-region
-          (if before
-              (goto-char (if (< (mark) (point)) (mark) (point)))
-            (goto-char (if (< (mark) (point)) (point) (mark)))))
+          (goto-char (if before
+                         (min (point) (mark))
+                       (max (point) (mark)))))
         (insert inserted-text)))))
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-at-point-with-context (prompt &optional num-lines)
   "Send NUM-LINES lines of context around point to ChatGPT with PROMPT and insert the output at point."
-  (interactive "sPrompt: \nnNumber of lines of context (default 3): ")
-  (let ((current-line (line-number-at-pos (point))))
-    (when (not current-line)
-      (insert (chatgpt-arcana--query-api prompt)))
-    (insert "[XXXX]")
-    (let* ((current-point (- (point) 6))
-           (num-lines (or num-lines 3))
-           (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
-           (system-prompt (concat (chatgpt-arcana-get-system-prompt-for-mode-name major-mode t) "\n"
-                                  "\nYour response will be inserted at [XXXX] in the selected region. Do not exceed the bounds of this context.\n"))
-           (user-prompt (concat prompt "\nSelected region:\n\n" context))
-           (modified-context (chatgpt-arcana--query-api-alist
-                             `(((role . "system") (content . ,system-prompt))
-                               ((role . "user") (content . ,user-prompt))))))
-      (save-excursion
-        (goto-char current-point)
-        (delete-char 6)
-        (insert modified-context)))))
+  (interactive "sPrompt: \nnNumber of lines of context: ")
+  (insert chatgpt-arcana-insert-context-placeholder)
+  (let* ((current-point (- (point) (length chatgpt-arcana-insert-context-placeholder)))
+         (num-lines (or num-lines 3))
+         (context (buffer-substring-no-properties (pos-bol (- (- num-lines 1))) (pos-eol (+ num-lines 1))))
+         (system-prompt (concat (chatgpt-arcana-get-system-prompt-for-mode-name major-mode t) "\n"
+                                "\nYour response will be inserted at " chatgpt-arcana-insert-context-placeholder " in the selected region. Do not exceed the bounds of this context.\n"))
+         (user-prompt (concat prompt "\nSelected region:\n\n" context))
+         (modified-context (chatgpt-arcana--query-api-alist
+                            `(((role . "system") (content . ,system-prompt))
+                              ((role . "user") (content . ,user-prompt))))))
+    (save-excursion
+      (goto-char current-point)
+      (delete-char (length chatgpt-arcana-insert-context-placeholder))
+      (insert modified-context))))
+
 
 ;;;###autoload
 (defun chatgpt-arcana-insert-after-region (prompt)
