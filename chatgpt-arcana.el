@@ -47,6 +47,12 @@
   :type 'boolean
   :group 'chatgpt-arcana-chat)
 
+(defcustom chatgpt-arcana-chat-fold-system-prompt-on-open t
+  "Whether the system prompt defaults to folded or not.
+Only does anything on Emacs >=28."
+  :type 'boolean
+  :group 'chatgpt-arcana-chat)
+
 (defcustom chatgpt-arcana-model-name "gpt-3.5-turbo"
   "The name of the OpenAI model to use. Some cost more than others. Beware."
   :type 'string
@@ -208,7 +214,8 @@ See also `gfm-mode-map'.")
 
   (run-hooks 'chatgpt-arcana-chat-mode-hook))
 
-(add-hook 'chatgpt-arcana-chat-mode-hook 'chatgpt-arcana-chat--fold-all-system-headings)
+(when chatgpt-arcana-chat-fold-system-prompt-on-open
+  (add-hook 'chatgpt-arcana-chat-mode-hook 'chatgpt-arcana-chat--fold-all-system-headings))
 
 (defun chatgpt-arcana-chat-copy-code-block ()
   "Copy the code block at point, excluding the first and last lines."
