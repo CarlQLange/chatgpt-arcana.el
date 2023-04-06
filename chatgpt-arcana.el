@@ -632,7 +632,6 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
     (deactivate-mark)
     (with-current-buffer (get-buffer-create "*chatgpt-arcana-chat*")
       (erase-buffer)
-      (chatgpt-arcana-chat-mode)
       (insert
        (let* (
               (full-prompt (concat
@@ -645,6 +644,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
           chatgpt-arcana-chat-separator-assistant
           (chatgpt-arcana--query-api-alist (chatgpt-arcana--chat-string-to-alist full-prompt)))))
       (chatgpt-arcana-chat-start-new-chat-response)
+      (chatgpt-arcana-chat-mode)
       (unless (get-buffer-window "*chatgpt-arcana-chat*")
         (if chatgpt-arcana-chat-split-window
             (if (eq chatgpt-arcana-chat-split-window 'vertical)
