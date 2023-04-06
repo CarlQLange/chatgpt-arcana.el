@@ -160,14 +160,55 @@ This function is async but doesn't take a callback."
       (chatgpt-arcana-chat-disable-autosave)
     (chatgpt-arcana-chat-enable-autosave)))
 
+(defun chatgpt-arcana-chat--cycle-or-tab ()
+  "Either fold a header or do `indent-for-tab-command'.
+Sadly it's a bit too hard to keep the markdown cycling.
+It's not so bad because markdown header cycling would be weird in chats."
+  (interactive)
+  (if (save-excursion (beginning-of-line) (looking-at-p chatgpt-arcana-chat-separator-line))
+      (if (>= emacs-major-version 28)
+          (outline-cycle)
+        (message "Outline-cycle only works on Emacs >= 28.")
+        (indent-for-tab-command))
+    (indent-for-tab-command)))
+
+(defun chatgpt-arcana-chat--fold-all-system-headings ()
+  "Folds all system blocks."
+  (if (>= emacs-major-version 28)
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward chatgpt-arcana-chat-separator-system nil t)
+          (outline-hide-subtree)))
+    (message "Outline-cycle only works on Emacs >= 28.")))
+
+(defvar chatgpt-arcana-chat-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map gfm-mode-map)
+    (define-key map (kbd "TAB") 'chatgpt-arcana-chat--cycle-or-tab)
+    (define-key map (kbd "C-c C-c") 'chatgpt-arcana-chat-send-message)
+    (define-key map (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
+    (define-key map (kbd "C-c C-a") 'chatgpt-arcana-chat-toggle-autosave)
+    (define-key map (kbd "C-c C-b") 'chatgpt-arcana-chat-copy-code-block)
+    map)
+  "Keymap for `chatgpt-arcana-chat-mode'.
+See also `gfm-mode-map'.")
+
+(defvar chatgpt-arcana-chat-mode-hook nil
+  "Hook for running code when `chatgpt-arcana-chat-mode' is activated")
+
 (define-derived-mode chatgpt-arcana-chat-mode gfm-mode "ChatGPT Arcana Chat"
   "A mode for chatting with the OpenAI GPT-3 API."
-  (local-set-key (kbd "C-c C-c") 'chatgpt-arcana-chat-send-message)
-  (local-set-key (kbd "C-c C-r") 'chatgpt-arcana-chat-rename-buffer-automatically)
-  (local-set-key (kbd "C-c C-a") 'chatgpt-arcana-chat-toggle-autosave)
-  (local-set-key (kbd "C-c C-b") 'chatgpt-arcana-chat-copy-code-block)
-  (run-with-idle-timer 5 nil 'chatgpt-arcana-chat-rename-buffer-automatically)
-  (when chatgpt-arcana-chat-autosave-enabled (chatgpt-arcana-chat-enable-autosave)))
+
+  ;; This allows for "folding" of chat segments.
+  (setq-local outline-regexp chatgpt-arcana-chat-separator-line)
+  (setq-local outline-level #'(lambda () 1))
+
+  (run-with-idle-timer 15 nil 'chatgpt-arcana-chat-rename-buffer-automatically)
+  (when chatgpt-arcana-chat-autosave-enabled (chatgpt-arcana-chat-enable-autosave))
+
+  (run-hooks 'chatgpt-arcana-chat-mode-hook))
+
+(add-hook 'chatgpt-arcana-chat-mode-hook 'chatgpt-arcana-chat--fold-all-system-headings)
 
 (defun chatgpt-arcana-chat-copy-code-block ()
   "Copy the code block at point, excluding the first and last lines."
@@ -582,7 +623,7 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
   (let*
       ((selected-region (and (use-region-p) (chatgpt-arcana-chat--wrap-region (buffer-substring-no-properties (mark) (point)) major-mode))))
     (deactivate-mark)
-    (with-current-buffer (get-buffer-create "*chatgpt-arcana-response*")
+    (with-current-buffer (get-buffer-create "*chatgpt-arcana-chat*")
       (erase-buffer)
       (chatgpt-arcana-chat-mode)
       (insert
@@ -597,12 +638,12 @@ With optional argument IGNORE-REGION, don't pay attention to the selected region
           chatgpt-arcana-chat-separator-assistant
           (chatgpt-arcana--query-api-alist (chatgpt-arcana--chat-string-to-alist full-prompt)))))
       (chatgpt-arcana-chat-start-new-chat-response)
-      (unless (get-buffer-window "*chatgpt-arcana-response*")
+      (unless (get-buffer-window "*chatgpt-arcana-chat*")
         (if chatgpt-arcana-chat-split-window
             (if (eq chatgpt-arcana-chat-split-window 'vertical)
                 (split-window-vertically)
               (split-window-horizontally)))
-        (switch-to-buffer "*chatgpt-arcana-response*")))))
+        (switch-to-buffer "*chatgpt-arcana-chat*")))))
 
 ;;;###autoload
 (defun chatgpt-arcana-start-chat (prompt)
