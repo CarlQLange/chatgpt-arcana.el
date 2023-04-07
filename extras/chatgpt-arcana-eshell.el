@@ -26,7 +26,7 @@ File info, may be nil:
   "User prompt for Eshell integration.
 The first format specifier is the user input from shell.
 The second format specifier is for a directory listing.
-The third format specifier is for information about files mentioned in the prompt."
+The third format specifier is for information about files mentioned in prompt."
   :type 'string :group 'chatgpt-arcana-eshell)
 
 (defun chatgpt-arcana-eshell--directory-listing ()
