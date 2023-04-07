@@ -70,6 +70,19 @@ My own config adds a few extra parts that don't need to be part of the package.
     (add-to-list 'all-the-icons-mode-icon-alist
                  '(chatgpt-arcana-chat-mode all-the-icons-octicon "comment-discussion" :height 1.0 :v-adjust -0.1 :face all-the-icons-purple)))
 
+(defun chatgpt-arcana-generate-prompt-shortcuts ()
+  "Generate a list of hydra commands for `chatgpt-arcana-common-prompts-alist'."
+  (mapcar (lambda (prompt)
+            (let* ((identifier (car prompt))
+                   (label (capitalize (symbol-name identifier)))
+                   (key (concat "s" (substring (symbol-name identifier) 0 1)))
+                   (command `(,key
+                              (lambda () (interactive)
+                                (chatgpt-arcana-query,(cdr prompt)))
+                              ,label)))
+              command))
+          chatgpt-arcana-common-prompts-alist))
+  
   (use-package pretty-hydra
     :config
     (eval `(pretty-hydra-define chatgpt-arcana-hydra (:color blue :quit-key "q" :title "ChatGPT Arcana")
