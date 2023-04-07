@@ -6,6 +6,18 @@
 
 ChatGPT-Arcana is an Emacs package that lets you chat with ChatGPT directly from emacs, operate on your code or text, generate `eshell` commands from natural language, and more.
 
+## Usage
+
+There are various interactive functions available. Some of them even work. This package provides the following functionality:
+
+- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat` or `chatgpt-arcana-chat-start-chat-with-system-prompt`. Automatically sends the selected region, if there is one.
+- Chat buffer auto-naming (modify prompt with custom var `chatgpt-arcana-generated-buffer-name-prompt`).
+- Chat session autosave and automatic file naming (disable with custom var`chatgpt-arcana-chat-autosave-enabled`, modify save directory with `chatgpt-arcana-chat-autosave-directory`).
+- Automatically handles token overflow for chats with several available strategies (`chatgpt-arcana-token-overflow-strategy` and `chatgpt-arcana-token-overflow-token-goal`)
+- Operate on your text or code with `chatgpt-arcana-replace-region`,  `chatgpt-arcana-insert-at-point-with-context`, and several others.
+- Use the `spell` eshell command to convert natural language into shell commands (when including `extras/chatgpt-arcana-eshell`).
+- [Very experimental] Create an agent that can use tools including web search and code eval with `query-loop` (when including `extras/chatgpt-arcana-react`)
+
 ## Examples
 
 #### Create and edit code
@@ -19,18 +31,6 @@ https://user-images.githubusercontent.com/859820/222563046-5928a98d-7498-4bce-99
 
 #### Have a lovely chat
 https://user-images.githubusercontent.com/859820/222718608-b767a663-86f9-4c56-acbe-192e1e91fe26.mp4
-
-## Usage
-
-There are various interactive functions available. Some of them even work. This package provides the following functionality:
-
-- Chat with GPT in Emacs with `chatgpt-arcana-chat-start-chat` or `chatgpt-arcana-chat-start-chat-with-system-prompt`. Automatically sends the selected region, if there is one.
-- Chat buffer auto-naming (modify prompt with custom var `chatgpt-arcana-generated-buffer-name-prompt`).
-- Chat session autosave and automatic file naming (disable with custom var`chatgpt-arcana-chat-autosave-enabled`, modify save directory with `chatgpt-arcana-chat-autosave-directory`).
-- Automatically handles token overflow for chats with several available strategies (`chatgpt-arcana-token-overflow-strategy` and `chatgpt-arcana-token-overflow-token-goal`)
-- Operate on your text or code with `chatgpt-arcana-replace-region`,  `chatgpt-arcana-insert-at-point-with-context`, and several others.
-- Use the `spell` eshell command to convert natural language into shell commands (when including `extras/chatgpt-arcana-eshell`).
-- [Very experimental] Create an agent that can use tools including web search and code eval with `query-loop` (when including `extras/chatgpt-arcana-react`)
 
 ## Installation
 
