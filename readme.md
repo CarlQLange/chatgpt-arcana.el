@@ -1,11 +1,10 @@
-
 # ChatGPT-Arcana
 
 ## About
 
-🔮 ChatGPT-Arcana is an Emacs Lisp package that gives you arcane powers.
+🔮 Put ChatGPT in your Emacs and give yourself arcane powers 🔮
 
-It lets you chat with ChatGPT directly from emacs, operate on your code or text, generate `eshell` commands from natural language, and more.
+ChatGPT-Arcana is an Emacs package that lets you chat with ChatGPT directly from emacs, operate on your code or text, generate `eshell` commands from natural language, and more.
 
 ## Examples
 
