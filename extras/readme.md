@@ -96,3 +96,7 @@ Sick of staring into the abyss of your terminal, trying to remember how to invok
 But like they tell us all in wizard school: with great power comes great responsibility. You should still know what the command is doing - it absolutely 100% will with no qualms tell you how to destroy the universe (`rm -rf /`).
 
 Also, this command by default sends an `ls` of the current directory and the first 500 bytes of any named files to the ChatGPT API.
+
+## ChatGPT Arcana Autofix
+
+Automatically fix errors at point, flagged by `flycheck` or `flymake`, with `chatgpt-arcana-autofix`.
