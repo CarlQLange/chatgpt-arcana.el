@@ -100,3 +100,11 @@ Also, this command by default sends an `ls` of the current directory and the fir
 ## ChatGPT Arcana Autofix
 
 Automatically fix errors at point, flagged by `flycheck` or `flymake`, with `chatgpt-arcana-autofix`.
+
+## ChatGPT Arcana Commitmsg
+
+Automatically write commit messages. Who needs to do that manually anyways.
+
+`chatgpt-arcana-commitmsg` will insert the commit message at point, so use it in a magit `COMMIT_EDITMSG` buffer.
+
+This will send the current diff against HEAD and the last few commit messages to ChatGPT.

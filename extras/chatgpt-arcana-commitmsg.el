@@ -12,7 +12,7 @@
 (defcustom chatgpt-arcana-commitmsg-system-prompt
   "You are an advanced program used to generate commit messages.
 Your job is simple: generate a commit message based on the provided diff and previous commit messages.
-READ THE DIFF CLOSELY.
+READ THE DIFF CLOSELY. Mention all noteworthy changes.
 
 Attempt to match the style and tone of previous commit messages as much as possible.
 The generated message MUST match the style and tone of the previous commit messages.
@@ -22,7 +22,6 @@ If they are descriptive, be descriptive; if they are concise, be concise; if the
 
 (defun chatgpt-arcana-commitmsg-query-api (prompt)
   "Query the API with the given PROMPT for a commit message."
-  (message "%S" prompt)
   (chatgpt-arcana--query-api-alist
    `(((role . "system") (content . ,chatgpt-arcana-commitmsg-system-prompt))
      ((role . "system") (name . "example_user")
@@ -58,7 +57,7 @@ Updated both the page title and the header."))
   "Get a commit message based on the current diff and previous commit messages."
   (interactive)
   (let* ((diff (chatgpt-arcana-commitmsg--git-get-current-diff))
-         (last-commits (chatgpt-arcana-commitmsg--git-get-last-few-commits 7))
+         (last-commits (chatgpt-arcana-commitmsg--git-get-last-few-commits 10))
          (prompt (concat "Please generate a commit message based on the following diff:\n\n"
                          diff "\n\n"
                          "Here are the latest commit messages:\n"
