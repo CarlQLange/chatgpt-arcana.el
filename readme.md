@@ -16,6 +16,7 @@ There are various interactive functions available. Some of them even work. This 
 - Automatically handles token overflow for chats with several available strategies (`chatgpt-arcana-token-overflow-strategy` and `chatgpt-arcana-token-overflow-token-goal`)
 - Operate on your text or code with `chatgpt-arcana-replace-region`,  `chatgpt-arcana-insert-at-point-with-context`, and several others.
 - Use the `spell` eshell command to convert natural language into shell commands (when including `extras/chatgpt-arcana-eshell`).
+- Automatically fix errors from `flycheck` or `flymake` with `chatgpt-arcana-autofix` (when including `extras/chatgpt-arcana-autofix`).
 - [Very experimental] Create an agent that can use tools including web search and code eval with `query-loop` (when including `extras/chatgpt-arcana-react`)
 
 ## Examples
