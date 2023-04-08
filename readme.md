@@ -17,6 +17,7 @@ There are various interactive functions available. Some of them even work. This 
 - Operate on your text or code with `chatgpt-arcana-replace-region`,  `chatgpt-arcana-insert-at-point-with-context`, and several others.
 - Use the `spell` eshell command to convert natural language into shell commands (when including `extras/chatgpt-arcana-eshell`).
 - Automatically fix errors at point from `flycheck` or `flymake` with `chatgpt-arcana-autofix` (when including `extras/chatgpt-arcana-autofix`).
+- Automatically write commit messages with `chatgpt-arcana-commitmsg` (when including `extras/chatgpt-arcana-commitmsg`)
 - [Very experimental] Create an agent that can use tools including web search and code eval with `query-loop` (when including `extras/chatgpt-arcana-react`)
 
 ## Examples
