@@ -30,8 +30,7 @@
       (reverse (cl-mapcar #'list commit-messages diffs)))))
 
 (defcustom chatgpt-arcana-commitmsg-system-prompt
-  "You are an advanced program used to generate commit messages.
-Your job is simple: generate a commit message based on the provided diff and previous commit messages.
+  "Your job is simple: write a commit message based on the provided diff and previous commit messages.
 It is crucial that you match the style and tone of previous commit messages as much as possible.
 Do NOT pay attention to the content of previous messages, only the style and tone.
 Be concise."
