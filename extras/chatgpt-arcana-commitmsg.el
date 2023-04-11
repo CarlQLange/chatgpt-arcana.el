@@ -2,13 +2,6 @@
   "Get the current diff from Git."
   (let ((default-directory (magit-toplevel)))
     (shell-command-to-string "git diff HEAD")))
-
-(defun chatgpt-arcana-commitmsg--git-get-last-few-commits (num-commits)
-  "Get the last NUM-COMMITS commit messages from Git."
-  (let ((num-commits-str (number-to-string num-commits))
-        (default-directory (magit-toplevel)))
-    (shell-command-to-string (concat "git log -" num-commits-str " --format=%B-"))))
-
 (defun chatgpt-arcana-commitmsg--git-get-last-diffs-and-commits (count)
   "Get the last COUNT diffs and commits from Git as an alist."
   (let* ((branch (magit-rev-parse "--abbrev-ref" "HEAD"))
@@ -40,6 +33,7 @@
   "You are an advanced program used to generate commit messages.
 Your job is simple: generate a commit message based on the provided diff and previous commit messages.
 It is crucial that you match the style and tone of previous commit messages as much as possible.
+Do NOT pay attention to the content of previous messages, only the style and tone.
 Be concise."
   "System prompt for commit message generation"
   :type 'string :group 'chatgpt-arcana)
@@ -52,10 +46,16 @@ Be concise."
          (initial-commit (car commits)))
     (list (list (cons 'role "system")
                 (cons 'name "example_user")
-                (cons 'content (concat "please generate a commit message based on the following diff: " (car diffs))))
+                (cons 'content (format "Please write a commit message based on the following diff:\n```\n%s\n```" (nth 1 diffs))))
           (list (cons 'role "system")
                 (cons 'name "example_assistant")
-                (cons 'content initial-commit)))))
+                (cons 'content (nth 1 commits)))
+          (list (cons 'role "system")
+                (cons 'name "example_user")
+                (cons 'content (format "Please write a commit message based on the following diff:\n```\n%s\n```" (nth 2 diffs))))
+          (list (cons 'role "system")
+                (cons 'name "example_assistant")
+                (cons 'content (nth 2 commits))))))
 
 (defun chatgpt-arcana-commitmsg-query-api (prompt)
   "Query the API with the given PROMPT for a commit message."
@@ -68,14 +68,19 @@ Be concise."
   "Get a commit message based on the current diff and previous commit messages."
   (interactive)
   (let* ((diff (chatgpt-arcana-commitmsg--git-get-current-diff))
-         (last-commits (chatgpt-arcana-commitmsg--git-get-last-few-commits 5))
-         (prompt (format "Please generate a commit message in keeping with the previous commit messages.
-Previous commit messages look like the following:
-------
+         (last-commits (chatgpt-arcana-commitmsg--git-get-last-few-commits 4))
+         (prompt (format "Please write a commit message in keeping with the previous commit messages.
+Here are some previous commit messages in this repo, separated by a hyphen:
+
+```
 %s
-------
+```
+
 Your message is about the following diff:
-%s"
+
+```
+%s
+```"
                          last-commits
                          diff))
          (commit-msg (chatgpt-arcana-commitmsg-query-api prompt)))
