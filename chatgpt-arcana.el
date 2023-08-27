@@ -30,12 +30,59 @@
   :type 'string
   :group 'chatgpt-arcana)
 
+(defcustom chatgpt-arcana-service 'openai
+  "Service to use. Either 'openai or 'azure-openai."
+  :type '(choice (const :tag "OpenAI" openai)
+                 (const :tag "Azure-OpenAI" azure-openai))
+  :group 'chatgpt-arcana)
+
+
+(defcustom chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions"
+  "Default API endpoint for OpenAI."
+  :type 'string
+  :group 'chatgpt-arcana)
+
+(defcustom chatgpt-arcana-api-base "https://your-instance.openai.azure.com"
+  "Base API URL for Azure-OpenAI."
+  :type 'string
+  :group 'chatgpt-arcana)
+
+;; Additional Azure-Openai specific variables
+(defcustom chatgpt-arcana-azure-openai-deployment "azure-openai-deployment-name"
+  "Deployment name for Azure-OpenAI API."
+  :type 'string
+  :group 'chatgpt-arcana)
+
+(defcustom chatgpt-arcana-azure-openai-api-version "2023-07-01-preview"
+  "API version for Azure-OpenAI."
+  :type 'string
+  :group 'chatgpt-arcana)
+
+(defun chatgpt-arcana--api-url ()
+  "Determine the complete API URL based on the selected service."
+  (cond
+   ((eq chatgpt-arcana-service 'azure-openai)
+    (format "%s/openai/deployments/%s/chat/completions?api-version=%s"
+	    chatgpt-arcana-api-base
+	    chatgpt-arcana-azure-openai-deployment
+	    chatgpt-arcana-azure-openai-api-version))
+   (t chatgpt-arcana-api-endpoint)))
+
+
+(defun chatgpt-arcana--api-headers ()
+  "Return the headers to use when querying the API."
+  `(("Content-Type" . "application/json")
+    ,(cond
+      ((eq chatgpt-arcana-service 'azure-openai)
+       `("api-key" . ,chatgpt-arcana-api-key))
+      (t `("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key))))))
+
+
+
 (defvar chatgpt-arcana-chat-separator-line "-------")
 (defvar chatgpt-arcana-chat-separator-system (concat chatgpt-arcana-chat-separator-line " system:\n\n"))
 (defvar chatgpt-arcana-chat-separator-user (concat "\n\n" chatgpt-arcana-chat-separator-line " user:\n\n"))
 (defvar chatgpt-arcana-chat-separator-assistant (concat "\n\n" chatgpt-arcana-chat-separator-line " assistant:\n\n"))
-
-(defvar chatgpt-arcana-api-endpoint "https://api.openai.com/v1/chat/completions")
 
 (defcustom chatgpt-arcana-chat-autosave-directory (concat user-emacs-directory "chatgpt-arcana/sessions")
   "Directory where chat session autosave files should be saved."
@@ -279,10 +326,6 @@ If CONCAT-MODE-TO-PROMPT is set, add current major mode to the system prompt."
   "Helper to replace fancy quotes in RESPONSE with normal ones."
   (replace-regexp-in-string "[“”‘’]" "`" (string-trim response)))
 
-(defun chatgpt-arcana--api-headers ()
-  "Return the headers to use when querying the API."
-  `(("Content-Type" . "application/json")
-    ("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key))))
 
 (defun chatgpt-arcana--api-json-parser ()
   "Return the JSON parser for API response."
@@ -325,7 +368,7 @@ The JSON should be a list of messages like (:role , role :content ,content)
 Returns the resulting message only."
   (let ((out))
     (request
-      chatgpt-arcana-api-endpoint
+      (chatgpt-arcana--api-url)
       :type "POST"
       :headers (chatgpt-arcana--api-headers)
       :parser (chatgpt-arcana--api-json-parser)
@@ -350,7 +393,7 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
   ; But, it does work. Mission accomplished.
   (lexical-let ((success-callback success-callback))
     (request
-      chatgpt-arcana-api-endpoint
+      (chatgpt-arcana--api-url)
       :type "POST"
       :headers (chatgpt-arcana--api-headers)
       :parser (chatgpt-arcana--api-json-parser)
