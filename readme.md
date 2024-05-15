@@ -1,5 +1,9 @@
 # ChatGPT-Arcana
 
+## Notice
+
+You are probably better off using [gptel](https://github.com/karthink/gptel), which seems to have a much wider featureset and much better elisp-fu!
+
 ## About
 
 🔮 Put ChatGPT in your Emacs and give yourself arcane powers 🔮
