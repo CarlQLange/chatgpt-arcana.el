@@ -77,7 +77,19 @@
        `("api-key" . ,chatgpt-arcana-api-key))
       (t `("Authorization" . ,(concat "Bearer " chatgpt-arcana-api-key))))))
 
+(defcustom chatgpt-arcana-functions nil
+  "A list of functions that ChatGPT can call."
+  :type 'alist
+  :group 'chatgpt-arcana)
 
+(defun chatgpt-arcana-register-function (name description parameters function)
+  "Register a new function for ChatGPT to call."
+  (add-to-list 'chatgpt-arcana-functions
+               `((type . "function")
+                 (function . ((name . ,name)
+                              (description . ,description)
+                              (parameters . ,parameters)
+                              (function . ,function))))))
 
 (defvar chatgpt-arcana-chat-separator-line "-------")
 (defvar chatgpt-arcana-chat-separator-system (concat chatgpt-arcana-chat-separator-line " system:\n\n"))
@@ -344,36 +356,15 @@ If CONCAT-MODE-TO-PROMPT is set, add current major mode to the system prompt."
 (defun chatgpt-arcana--api-error-handler ()
   "Handle errors thrown by API queries."
   (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                 (message "Error: %S" error-thrown))))
+                 (message "Error: %S %S" error-thrown args))))
 
-(defun chatgpt-arcana--query-api (prompt)
-  "Send a query to the OpenAI API with PROMPT and return the first message content."
-  (let ((out))
-    (request
-      chatgpt-arcana-api-endpoint
-      :type "POST"
-      :headers (chatgpt-arcana--api-headers)
-      :parser (chatgpt-arcana--api-json-parser)
-      :encoding 'utf-8
-      :sync t
-      :error (chatgpt-arcana--api-error-handler)
-      :data (json-encode `((model . ,chatgpt-arcana-model-name)
-                           (messages . [((role . "user")
-                                         (content . ,prompt))])))
-      :success (cl-function
-                (lambda (&key response &allow-other-keys)
-                  (setq out
-                        (chatgpt-arcana--process-api-response
-                         (chatgpt-arcana--get-response-content
-                          (request-response-data response)))))))
-    out))
-
-(defun chatgpt-arcana--query-api-alist (messages-alist &optional model-name)
+(defun chatgpt-arcana--query-api-alist (messages-alist &optional model-name functions)
   "Query the OpenAI API with formatted MESSAGES-ALIST.
 The JSON should be a list of messages like (:role , role :content ,content)
 Returns the resulting message only."
   (let ((out)
-        (model-name (or model-name chatgpt-arcana-model-name)))
+        (model-name (or model-name chatgpt-arcana-model-name))
+        (functions (when functions chatgpt-arcana-functions)))
     (request
       (chatgpt-arcana--api-url)
       :type "POST"
@@ -383,23 +374,23 @@ Returns the resulting message only."
       :sync t
       :error (chatgpt-arcana--api-error-handler)
       :data (json-encode `(:model ,model-name
-                           :messages ,messages-alist))
+                           :messages ,messages-alist
+                           :tools ,functions))
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
-                  (setq out
-                        (chatgpt-arcana--process-api-response
-                         (chatgpt-arcana--get-response-content
-                          (request-response-data response)))))))
+                  (let ((response-data (request-response-data response)))
+                    (setq out (chatgpt-arcana--handle-api-response response-data)))) ))
     out))
 
-(defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback &optional model-name)
+(defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback &optional model-name functions)
   "Query the OpenAI API with formatted MESSAGES-ALIST asynchronously.
 MESSAGES-ALIST should be a list of messages (:role , role :content ,content).
 SUCCESS-CALLBACK will be called upon success with the response as its argument."
   ;; I think it's clear that I don't 100% know what I'm doing here.
   ;; But, it does work. Mission accomplished.
   (lexical-let ((success-callback success-callback)
-                (model-name (or model-name chatgpt-arcana-model-name)))
+                (model-name (or model-name chatgpt-arcana-model-name))
+                (functions (when functions chatgpt-arcana-functions)))
     (request
       (chatgpt-arcana--api-url)
       :type "POST"
@@ -408,14 +399,32 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :encoding 'utf-8
       :error (chatgpt-arcana--api-error-handler)
       :data (json-encode `(:model ,model-name
-                           :messages ,messages-alist))
+                           :messages ,messages-alist
+                           :tools ,functions))
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
                   (when data
                     (let* ((success-callback success-callback))
                       (funcall success-callback
-                               (chatgpt-arcana--process-api-response
-                                (chatgpt-arcana--get-response-content data))))))))))
+                               (chatgpt-arcana--handle-api-response data)))))))))
+
+(defun chatgpt-arcana--handle-api-response (response-data)
+  "Handle the API response, including executing function calls if needed."
+  (let* ((choices (gethash "choices" response-data))
+         (first-choice (car choices))
+         (tool-calls (gethash "tool_calls" (gethash "message" first-choice))))
+    (if tool-calls
+        (let* ((tool-call (car tool-calls))
+               (arguments (let ((json-object-type 'hash-table)) (json-read-from-string (gethash "arguments" (gethash "function" tool-call)))))
+               (function-name (gethash "name" (gethash "function" tool-call)))
+               (func-entry (seq-find (lambda (entry)
+                                       (string= function-name (alist-get 'name (alist-get 'function entry))))
+                                     chatgpt-arcana-functions)))
+          (when func-entry
+            (let* ((func (alist-get 'function (alist-get 'function func-entry)))
+                   (result (funcall func arguments)))
+              (json-encode `(:role "function" :content ,result)))))
+      (gethash "content" (gethash "message" first-choice)))))
 
 (defun chatgpt-arcana-generate-buffer-name-async (&optional buffer prefix temp callback)
   "Generate a buffer name for BUFFER based on the input prompt.
