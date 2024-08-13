@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Carl Lange
 ;; Author: Carl Lange <carl@flax.ie>
 ;; URL: https://github.com/CarlQLange/chatgpt-arcana
-;; Package-Requires: ((emacs "26.1"))
+;; Package-Requires: ((emacs "29.1"))
 ;; Version: 0.1
 ;;
 ;; This file is not part of GNU Emacs.
@@ -33,7 +33,7 @@
 (defcustom chatgpt-arcana-service 'openai
   "Service to use. Either 'openai or 'azure-openai."
   :type '(choice (const :tag "OpenAI" openai)
-                 (const :tag "Azure-OpenAI" azure-openai))
+          (const :tag "Azure-OpenAI" azure-openai))
   :group 'chatgpt-arcana)
 
 
@@ -100,8 +100,13 @@ Only does anything on Emacs >=28."
   :type 'boolean
   :group 'chatgpt-arcana-chat)
 
-(defcustom chatgpt-arcana-model-name "gpt-3.5-turbo"
-  "The name of the OpenAI model to use. Some cost more than others. Beware."
+(defcustom chatgpt-arcana-model-name "gpt-4o-2024-08-06"
+  "The name of the OpenAI model to use for most tasks."
+  :type 'string
+  :group 'chatgpt-arcana)
+
+(defcustom chatgpt-arcana-mini-model-name "gpt-4o-mini"
+  "The name of the OpenAI model to use for simple tasks."
   :type 'string
   :group 'chatgpt-arcana)
 
@@ -154,8 +159,8 @@ Input follows. Don't forget - ONLY respond with the buffer name and no other tex
 (defcustom chatgpt-arcana-chat-split-window 'horizontal
   "Specifies how the chat window is split: vertically, horizontally, or not at all."
   :type '(choice (const :tag "horizontal" horizontal)
-                 (const :tag "vertical" vertical)
-                 (const :tag "none" nil))
+          (const :tag "vertical" vertical)
+          (const :tag "none" nil))
   :group 'chatgpt-arcana-chat)
 
 (defcustom chatgpt-arcana-token-overflow-strategy "truncate"
@@ -169,8 +174,9 @@ Possible values are \"truncate\" to truncate the input,
           (const :tag "Summarize each message (not well-tested)" "summarize-each"))
   :group 'chatgpt-arcana)
 
-(defcustom chatgpt-arcana-token-overflow-token-goal 3000
-  "The number of tokens to aim for if a token overflow has happened."
+(defcustom chatgpt-arcana-token-overflow-token-goal 64000
+  "The number of tokens to aim for if a token overflow has happened.
+By default this is half the common context window of 12800"
   :type 'number
   :group 'chatgpt-arcana)
 
@@ -283,9 +289,9 @@ See also `gfm-mode-map'.")
 (add-to-list 'auto-mode-alist '("\\.chatgpt-arcana\\.md\\'" . chatgpt-arcana-chat-mode))
 
 (font-lock-add-keywords
-  'chatgpt-arcana-chat-mode
-  '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
-    ("^--[-]+" . font-lock-comment-face)))
+ 'chatgpt-arcana-chat-mode
+ '(("^--[-]+\\(.*\\):$" 1 font-lock-constant-face)
+   ("^--[-]+" . font-lock-comment-face)))
 
 (defun chatgpt-arcana-chat--wrap-region (selected-region mode)
   "Wrap SELECTED-REGION in triple backticks with the code identifier for MODE.
@@ -356,17 +362,18 @@ If CONCAT-MODE-TO-PROMPT is set, add current major mode to the system prompt."
                                          (content . ,prompt))])))
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
-                    (setq out
-                          (chatgpt-arcana--process-api-response
-                           (chatgpt-arcana--get-response-content
-                            (request-response-data response)))))))
+                  (setq out
+                        (chatgpt-arcana--process-api-response
+                         (chatgpt-arcana--get-response-content
+                          (request-response-data response)))))))
     out))
 
-(defun chatgpt-arcana--query-api-alist (messages-alist)
+(defun chatgpt-arcana--query-api-alist (messages-alist &optional model-name)
   "Query the OpenAI API with formatted MESSAGES-ALIST.
 The JSON should be a list of messages like (:role , role :content ,content)
 Returns the resulting message only."
-  (let ((out))
+  (let ((out)
+        (model-name (or model-name chatgpt-arcana-model-name)))
     (request
       (chatgpt-arcana--api-url)
       :type "POST"
@@ -375,7 +382,7 @@ Returns the resulting message only."
       :encoding 'utf-8
       :sync t
       :error (chatgpt-arcana--api-error-handler)
-      :data (json-encode `(:model ,chatgpt-arcana-model-name
+      :data (json-encode `(:model ,model-name
                            :messages ,messages-alist))
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
@@ -385,13 +392,14 @@ Returns the resulting message only."
                           (request-response-data response)))))))
     out))
 
-(defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback)
+(defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback &optional model-name)
   "Query the OpenAI API with formatted MESSAGES-ALIST asynchronously.
 MESSAGES-ALIST should be a list of messages (:role , role :content ,content).
 SUCCESS-CALLBACK will be called upon success with the response as its argument."
-  ; I think it's clear that I don't 100% know what I'm doing here.
-  ; But, it does work. Mission accomplished.
-  (lexical-let ((success-callback success-callback))
+  ;; I think it's clear that I don't 100% know what I'm doing here.
+  ;; But, it does work. Mission accomplished.
+  (lexical-let ((success-callback success-callback)
+                (model-name (or model-name chatgpt-arcana-model-name)))
     (request
       (chatgpt-arcana--api-url)
       :type "POST"
@@ -399,7 +407,7 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :parser (chatgpt-arcana--api-json-parser)
       :encoding 'utf-8
       :error (chatgpt-arcana--api-error-handler)
-      :data (json-encode `(:model ,chatgpt-arcana-model-name
+      :data (json-encode `(:model ,model-name
                            :messages ,messages-alist))
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
@@ -431,7 +439,8 @@ CALLBACK called with the buffer name as response."
            (cond ((and prefix temp) (setq name (concat "*" prefix name "*")))
                  (prefix (setq name (concat prefix "-" name)))
                  (temp (setq name (concat "*" name "*")))))
-         (funcall callback name))))))
+         (funcall callback name)))
+     chatgpt-arcana-mini-model-name)))
 
 (defun chatgpt-arcana-chat-rename-buffer-automatically ()
   "Magically rename a buffer based on its contents.
@@ -478,9 +487,9 @@ Returns the truncated alist."
     (cl-loop for msg in (nreverse chat-alist)
              sum (chatgpt-arcana--token-count-approximation (alist-get 'content msg)) into current-tokens
              when (< current-tokens token-goal)
-               do (push (cl-remove nil `(,(assoc 'name msg)
-                                         ,(assoc 'role msg)
-                                         ,(assoc 'content msg))) new-alist))
+             do (push (cl-remove nil `(,(assoc 'name msg)
+                                       ,(assoc 'role msg)
+                                       ,(assoc 'content msg))) new-alist))
     new-alist))
 
 (defun chatgpt-arcana--token-overflow-truncate-keep-first-user (chat-alist token-goal)
@@ -489,13 +498,13 @@ See `chatgpt-arcana--token-overflow-truncate'."
   ;; This is horrible, I'm certain there's a nice cl-loop macro for it instead...
   (let* ((first-user-message (cl-find-if (lambda (m) (string= (alist-get 'role m) "user")) chat-alist))
          (token-count (- 0 (chatgpt-arcana--token-count-approximation (alist-get 'content first-user-message))))
-        new-alist)
+         new-alist)
     (cl-loop for msg in (nreverse chat-alist)
              sum (chatgpt-arcana--token-count-approximation (alist-get 'content msg)) into current-tokens
              when (< current-tokens token-goal)
-               do (push (cl-remove nil `(,(assoc 'name msg)
-                                         ,(assoc 'role msg)
-                                         ,(assoc 'content msg))) new-alist))
+             do (push (cl-remove nil `(,(assoc 'name msg)
+                                       ,(assoc 'role msg)
+                                       ,(assoc 'content msg))) new-alist))
     (let ((first-assistant-message-pos (cl-position-if (lambda (m) (string= (alist-get 'role m) "assistant")) new-alist)))
       (when (not (eq (car new-alist) first-user-message))
         (setq new-alist (-insert-at first-assistant-message-pos first-user-message new-alist)))
@@ -524,18 +533,18 @@ and the resulting chat may not be that much smaller. Not highly recommended."
            #'+
            (mapcar (lambda (m) (chatgpt-arcana--token-count-approximation (alist-get 'content m))) messages)))
          (new-messages (cl-loop for item in messages
-                  collect
-                  (let* ((role (alist-get 'role item))
-                         (name (alist-get 'name item))
-                         (content
-                          (if (> token-count token-goal)
-                              (chatgpt-arcana--token-overflow-summarize-each--summarize-message
-                               (alist-get 'content item))
-                            (alist-get 'content item))))
-                    (setq token-count (- token-count (chatgpt-arcana--token-count-approximation content)))
-                    (cl-remove nil `((role . ,role)
-                                     ,(when name `(name . ,name))
-                                     (content . ,content)))))))
+                                collect
+                                (let* ((role (alist-get 'role item))
+                                       (name (alist-get 'name item))
+                                       (content
+                                        (if (> token-count token-goal)
+                                            (chatgpt-arcana--token-overflow-summarize-each--summarize-message
+                                             (alist-get 'content item))
+                                          (alist-get 'content item))))
+                                  (setq token-count (- token-count (chatgpt-arcana--token-count-approximation content)))
+                                  (cl-remove nil `((role . ,role)
+                                                   ,(when name `(name . ,name))
+                                                   (content . ,content)))))))
     new-messages))
 
 (defun chatgpt-arcana--handle-token-overflow (chat-alist &optional token-goal strategy-override)
@@ -543,8 +552,8 @@ and the resulting chat may not be that much smaller. Not highly recommended."
 If TOKEN-GOAL is less than the number of tokens in CHAT-ALIST, use
 `chatgpt-arcana-token-overflow-strategy' or STRATEGY-OVERRIDE to reduce the
 number of tokens in CHAT-ALIST.
-TOKEN-GOAL is 3000 by default as the typical context limit is 4000 tokens."
-  (let ((token-goal (or token-goal 3000))
+TOKEN-GOAL is 64000 by default as the typical context limit - about 50% of the average context window."
+  (let ((token-goal (or token-goal 64000))
         (strategy (or strategy-override chatgpt-arcana-token-overflow-strategy)))
     (if (> (chatgpt-arcana--token-count-alist chat-alist) token-goal)
         (cond ((string= strategy "truncate")
@@ -566,12 +575,12 @@ TOKEN-GOAL is 3000 by default as the typical context limit is 4000 tokens."
       (insert chat-string)
       (goto-char (point-min))
       (reverse (while (search-forward-regexp regex nil t)
-        (let* ((role (match-string-no-properties 1))
-               (start (point))
-               (end (when (save-excursion (search-forward-regexp regex nil t))
-                      (match-beginning 0)))
-               (content (buffer-substring-no-properties start (or end (point-max)))))
-          (push `((role . ,role) (content . ,(string-trim content))) messages)))))
+                 (let* ((role (match-string-no-properties 1))
+                        (start (point))
+                        (end (when (save-excursion (search-forward-regexp regex nil t))
+                               (match-beginning 0)))
+                        (content (buffer-substring-no-properties start (or end (point-max)))))
+                   (push `((role . ,role) (content . ,(string-trim content))) messages)))))
     (chatgpt-arcana--handle-token-overflow (reverse messages) chatgpt-arcana-token-overflow-token-goal)))
 
 (defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
@@ -584,7 +593,7 @@ TOKEN-GOAL is 3000 by default as the typical context limit is 4000 tokens."
   "The default name of the chat buffer.")
 
 (defun chatgpt-arcana--conversation-alist-to-chat-buffer (chat-messages
-                                                           &optional buffer-name mode-to-enable skip-system)
+                                                          &optional buffer-name mode-to-enable skip-system)
   "Transform CHAT-MESSAGES into a chat buffer.
 
 If SKIP-SYSTEM is non-nil, skip messages where the role is \"system\".
@@ -631,7 +640,7 @@ and insert the output before/after the region or at point.
 With BEFORE, insert the output before the region.
 With IGNORE-REGION, don't pay attention to the selected region."
   (let ((selected-region (when (and (region-active-p) (not ignore-region))
-                             (buffer-substring-no-properties (mark) (point)))))
+                           (buffer-substring-no-properties (mark) (point)))))
     (deactivate-mark)
     (save-excursion
       (let* ((input (concat prompt (when selected-region (concat "\n\n" selected-region "\n\n"))))
@@ -699,10 +708,10 @@ PROMPT is a standard instruction or message from the user."
       (insert
        (let* (
               (full-prompt (concat
-                   chatgpt-arcana-chat-separator-system
-                   system-prompt
-                   chatgpt-arcana-chat-separator-user
-                   prompt (and selected-region (concat "\n\n" selected-region)))))
+                            chatgpt-arcana-chat-separator-system
+                            system-prompt
+                            chatgpt-arcana-chat-separator-user
+                            prompt (and selected-region (concat "\n\n" selected-region)))))
          (concat
           full-prompt
           chatgpt-arcana-chat-separator-assistant
@@ -776,7 +785,7 @@ This function is async, but doesn't take a callback."
   (interactive)
   (chatgpt-arcana-chat-send-buffer-and-insert-at-end))
 
-; TODO this should probably go into my own config
+;; TODO this should probably go into my own config
 (defun chatgpt-arcana-generate-prompt-shortcuts ()
   "Generate a list of hydra commands for `chatgpt-arcana-common-prompts-alist'."
   (message "chatgpt-arcana-generate-prompt-shortcuts will be removed soon")
