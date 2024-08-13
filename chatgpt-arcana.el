@@ -63,9 +63,9 @@
   (cond
    ((eq chatgpt-arcana-service 'azure-openai)
     (format "%s/openai/deployments/%s/chat/completions?api-version=%s"
-	    chatgpt-arcana-api-base
-	    chatgpt-arcana-azure-openai-deployment
-	    chatgpt-arcana-azure-openai-api-version))
+            chatgpt-arcana-api-base
+            chatgpt-arcana-azure-openai-deployment
+            chatgpt-arcana-azure-openai-api-version))
    (t chatgpt-arcana-api-endpoint)))
 
 
