@@ -272,7 +272,7 @@ See also `gfm-mode-map'.")
   "Hook for running code when `chatgpt-arcana-chat-mode' is activated.")
 
 (define-derived-mode chatgpt-arcana-chat-mode gfm-mode "ChatGPT Arcana Chat"
-  "A mode for chatting with the OpenAI GPT-3 API."
+  "A mode for chatting with the OpenAI GPT API."
 
   ;; This allows for "folding" of chat segments.
   (setq-local outline-regexp chatgpt-arcana-chat-separator-line)
