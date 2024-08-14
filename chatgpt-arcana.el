@@ -93,8 +93,8 @@
 
 (defvar chatgpt-arcana-chat-separator-line "-------")
 (defvar chatgpt-arcana-chat-separator-system (concat chatgpt-arcana-chat-separator-line " system:\n\n"))
-(defvar chatgpt-arcana-chat-separator-user (concat "\n\n" chatgpt-arcana-chat-separator-line " user:\n\n"))
-(defvar chatgpt-arcana-chat-separator-assistant (concat "\n\n" chatgpt-arcana-chat-separator-line " assistant:\n\n"))
+(defvar chatgpt-arcana-chat-separator-user (concat chatgpt-arcana-chat-separator-line " user:\n\n"))
+(defvar chatgpt-arcana-chat-separator-assistant (concat chatgpt-arcana-chat-separator-line " assistant:\n\n"))
 
 (defcustom chatgpt-arcana-chat-autosave-directory (concat user-emacs-directory "chatgpt-arcana/sessions")
   "Directory where chat session autosave files should be saved."
@@ -112,7 +112,7 @@ Only does anything on Emacs >=28."
   :type 'boolean
   :group 'chatgpt-arcana-chat)
 
-(defcustom chatgpt-arcana-model-name "gpt-4o-2024-08-06"
+(defcustom chatgpt-arcana-model-name "gpt-4o-2024-05-13"
   "The name of the OpenAI model to use for most tasks."
   :type 'string
   :group 'chatgpt-arcana)
@@ -130,6 +130,9 @@ Only does anything on Emacs >=28."
   "Alist of common prompts."
   :type 'alist
   :group 'chatgpt-arcana)
+
+(defconst chatgpt-arcana-chat-default-chat-buffer-name "*chatgpt-arcana-chat*"
+  "The default name of the chat buffer.")
 
 (defcustom chatgpt-arcana-generated-buffer-name-prompt
   "You are an Emacs function that generate a useful and descriptive Emacs buffer name based on this content. The name should be lowercase, hyphenated, not too long.
@@ -379,7 +382,7 @@ Returns the resulting message only."
       :success (cl-function
                 (lambda (&key response &allow-other-keys)
                   (let ((response-data (request-response-data response)))
-                    (setq out (chatgpt-arcana--handle-api-response response-data)))) ))
+                    (setq out (chatgpt-arcana--handle-api-response response-data messages-alist)))) ))
     out))
 
 (defun chatgpt-arcana--query-api-alist-async (messages-alist success-callback &optional model-name functions)
@@ -389,6 +392,7 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
   ;; I think it's clear that I don't 100% know what I'm doing here.
   ;; But, it does work. Mission accomplished.
   (lexical-let ((success-callback success-callback)
+                (messages-alist messages-alist)
                 (model-name (or model-name chatgpt-arcana-model-name))
                 (functions (when functions chatgpt-arcana-functions)))
     (request
@@ -404,27 +408,34 @@ SUCCESS-CALLBACK will be called upon success with the response as its argument."
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
                   (when data
-                    (let* ((success-callback success-callback))
+                    (let* ((success-callback success-callback)
+                           (messages-alist messages-alist))
                       (funcall success-callback
-                               (chatgpt-arcana--handle-api-response data)))))))))
+                               (chatgpt-arcana--handle-api-response data messages-alist)))))))))
 
-(defun chatgpt-arcana--handle-api-response (response-data)
-  "Handle the API response, including executing function calls if needed."
+(defun chatgpt-arcana--handle-api-response (response-data messages-alist)
+  "Handle the API response, including executing function calls if needed.
+Return an updated messages-alist, including the assistant's response."
   (let* ((choices (gethash "choices" response-data))
          (first-choice (car choices))
-         (tool-calls (gethash "tool_calls" (gethash "message" first-choice))))
+         (tool-calls (gethash "tool_calls" (gethash "message" first-choice)))
+         (assistant-response (gethash "content" (gethash "message" first-choice))))
     (if tool-calls
         (let* ((tool-call (car tool-calls))
                (arguments (let ((json-object-type 'hash-table)) (json-read-from-string (gethash "arguments" (gethash "function" tool-call)))))
                (function-name (gethash "name" (gethash "function" tool-call)))
                (func-entry (seq-find (lambda (entry)
                                        (string= function-name (alist-get 'name (alist-get 'function entry))))
-                                     chatgpt-arcana-functions)))
+                                     chatgpt-arcana-functions))
+               (new-message `((role . "assistant") (content . ,assistant-response))))
           (when func-entry
             (let* ((func (alist-get 'function (alist-get 'function func-entry)))
-                   (result (funcall func arguments)))
-              (json-encode `(:role "function" :content ,result)))))
-      (gethash "content" (gethash "message" first-choice)))))
+                   (result (funcall func arguments))
+                   (result-message `((role . "function") (name . ,function-name) (content . ,result))))
+              (setq messages-alist (append messages-alist (list new-message result-message))))))
+      (let ((response-message `((role . "assistant") (content . ,assistant-response))))
+        (setq messages-alist (append messages-alist (list response-message)))))
+    messages-alist))
 
 (defun chatgpt-arcana-generate-buffer-name-async (&optional buffer prefix temp callback)
   "Generate a buffer name for BUFFER based on the input prompt.
@@ -443,7 +454,7 @@ CALLBACK called with the buffer name as response."
      `(((role . "system") (content . ,chatgpt-arcana-generated-buffer-name-prompt))
        ((role . "user") (content . ,input)))
      (lambda (data)
-       (let ((name data))
+       (let ((name (alist-get 'content (car (last data)))))
          (with-current-buffer buf
            (cond ((and prefix temp) (setq name (concat "*" prefix name "*")))
                  (prefix (setq name (concat prefix "-" name)))
@@ -579,17 +590,25 @@ TOKEN-GOAL is 64000 by default as the typical context limit - about 50% of the a
 (defun chatgpt-arcana--chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
   (let ((messages '())
-        (regex "^-+\s*\\(.*\\):\s*$"))
+        (regex "^-+\s-*\\(.*\\):\s*$"))
     (with-temp-buffer
       (insert chat-string)
       (goto-char (point-min))
       (reverse (while (search-forward-regexp regex nil t)
-                 (let* ((role (match-string-no-properties 1))
+                 (let* ((role-match (match-string-no-properties 1))
+                        (role-parts (split-string role-match))
+                        (role (car role-parts))
+                        (name (when (and role-parts
+                                         (string= role "function"))
+                                (mapconcat 'identity (cdr role-parts) " ")))
                         (start (point))
                         (end (when (save-excursion (search-forward-regexp regex nil t))
                                (match-beginning 0)))
                         (content (buffer-substring-no-properties start (or end (point-max)))))
-                   (push `((role . ,role) (content . ,(string-trim content))) messages)))))
+                   (push `((role . ,role)
+                           ,@(when name `((name . ,name)))
+                           (content . ,(string-trim content)))
+                         messages)))))
     (chatgpt-arcana--handle-token-overflow (reverse messages) chatgpt-arcana-token-overflow-token-goal)))
 
 (defun chatgpt-arcana--chat-buffer-to-alist (&optional buffer)
@@ -598,28 +617,28 @@ TOKEN-GOAL is 64000 by default as the typical context limit - about 50% of the a
     (let ((chat-string (buffer-string)))
       (chatgpt-arcana--chat-string-to-alist chat-string))))
 
-(defconst chatgpt-arcana-chat-default-chat-buffer-name "*chatgpt-arcana-chat*"
-  "The default name of the chat buffer.")
-
 (defun chatgpt-arcana--conversation-alist-to-chat-buffer (chat-messages
-                                                          &optional buffer-name mode-to-enable skip-system)
+                                                          &optional buffer-name mode-to-enable)
   "Transform CHAT-MESSAGES into a chat buffer.
 
-If SKIP-SYSTEM is non-nil, skip messages where the role is \"system\".
 If MODE-TO-ENABLE is non-nil, enable the specified major mode in the buffer.
 If BUFFER-NAME is nil, use the default buffer name."
-  (let ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
-        (buffer-name (or buffer-name chatgpt-arcana-chat-default-chat-buffer-name))
-        (chat-buffer (get-buffer-create buffer-name)))
+  (let* ((mode (or mode-to-enable 'chatgpt-arcana-chat-mode))
+         (buffer-name (or buffer-name chatgpt-arcana-chat-default-chat-buffer-name))
+         (chat-buffer (get-buffer-create buffer-name)))
     (with-current-buffer chat-buffer
       (when mode
         (funcall mode))
       (erase-buffer)
       (dolist (message chat-messages)
         (let ((role (alist-get 'role message))
+              (name (alist-get 'name message))
               (content (alist-get 'content message)))
-          (when (or (not skip-system) (not (string= "system" role)))
-            (insert
+          (insert
+           (if name
+               (format
+                "%s %s %s:\n\n%s\n\n"
+                chatgpt-arcana-chat-separator-line role name content)
              (format
               "%s %s:\n\n%s\n\n"
               chatgpt-arcana-chat-separator-line role content)))))
@@ -713,18 +732,14 @@ PROMPT is a standard instruction or message from the user."
       ((selected-region (and (use-region-p) (chatgpt-arcana-chat--wrap-region (buffer-substring-no-properties (mark) (point)) major-mode))))
     (deactivate-mark)
     (with-current-buffer (get-buffer-create chatgpt-arcana-chat-default-chat-buffer-name)
-      (erase-buffer)
-      (insert
-       (let* (
-              (full-prompt (concat
-                            chatgpt-arcana-chat-separator-system
-                            system-prompt
-                            chatgpt-arcana-chat-separator-user
-                            prompt (and selected-region (concat "\n\n" selected-region)))))
-         (concat
-          full-prompt
-          chatgpt-arcana-chat-separator-assistant
-          (chatgpt-arcana--query-api-alist (chatgpt-arcana--chat-string-to-alist full-prompt)))))
+      (let* (
+             (full-prompt (concat
+                           chatgpt-arcana-chat-separator-system
+                           system-prompt
+                           "\n\n"
+                           chatgpt-arcana-chat-separator-user
+                           prompt (and selected-region (concat "\n\n" selected-region)))))
+        (chatgpt-arcana--conversation-alist-to-chat-buffer (chatgpt-arcana--query-api-alist (chatgpt-arcana--chat-string-to-alist full-prompt) chatgpt-arcana-model-name 't)))
       (chatgpt-arcana-chat-start-new-chat-response)
       (chatgpt-arcana-chat-mode)
       (unless (get-buffer-window chatgpt-arcana-chat-default-chat-buffer-name)
@@ -776,17 +791,17 @@ This function is async, but doesn't take a callback."
     (chatgpt-arcana--query-api-alist-async
      (chatgpt-arcana--chat-buffer-to-alist)
      (lambda (data)
-       (let ((inserted-text data))
+       (let ((messages data))
          (with-current-buffer buffer-name
            (save-excursion
-             (goto-char (point-max))
-             (when (not (string-match-p "^ *\n\n[-]+.*\n" inserted-text))
-               (setq inserted-text (concat chatgpt-arcana-chat-separator-assistant inserted-text)))
-             (insert inserted-text)
+             (chatgpt-arcana--conversation-alist-to-chat-buffer messages buffer-name)
              (chatgpt-arcana-chat-start-new-chat-response)
              (when chatgpt-arcana-chat-autosave-enabled
                (chatgpt-arcana-chat-save-to-autosave-file buffer-name)))
-           (goto-char (point-max))))))))
+           (goto-char (point-max)))))
+     chatgpt-arcana-model-name
+     't ;; enable function calling
+     )))
 
 (defun chatgpt-arcana-chat-send-message ()
   "Send a message to chatgpt, to be used in a chatgpt-arcana-chat buffer.
