@@ -590,7 +590,7 @@ TOKEN-GOAL is 64000 by default as the typical context limit - about 50% of the a
 (defun chatgpt-arcana--chat-string-to-alist (chat-string)
   "Transforms CHAT-STRING into a JSON array of chat messages."
   (let ((messages '())
-        (regex "^-+\s-*\\(.*\\):\s*$"))
+        (regex "^--+\s-*\\(.*\\):\s*$"))
     (with-temp-buffer
       (insert chat-string)
       (goto-char (point-min))
