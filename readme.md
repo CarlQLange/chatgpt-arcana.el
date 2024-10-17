@@ -1,8 +1,8 @@
 # ChatGPT-Arcana
 
-## Notice
+## Notice of archival
 
-You are probably better off using [gptel](https://github.com/karthink/gptel), which seems to have a much wider featureset and much better elisp-fu!
+You are significantly better off using [gptel](https://github.com/karthink/gptel), which seems to have a much wider featureset and much better elisp-fu. I have personally switched to that library and so this repository has been archived. Thanks for the stars, issues, and PRs, and may the force be with you!
 
 ## About
 
